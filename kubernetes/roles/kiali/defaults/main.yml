@@ -2,6 +2,11 @@
 kiali_namespace: istio-system
 kiali_version: "2.5.0"
 
+# Authentication strategy: token (requires SA token to login)
+# To get a login token, run:
+#   kubectl -n istio-system create token kiali-service-account
+kiali_auth_strategy: token
+
 prometheus_url: "http://kube-prometheus-stack-prometheus.monitoring:9090"
 grafana_url: "http://kube-prometheus-stack-grafana.monitoring:80"
 grafana_external_url: "http://grafana.homelab.local"

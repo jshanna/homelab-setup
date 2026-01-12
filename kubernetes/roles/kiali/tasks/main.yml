@@ -35,11 +35,13 @@
         namespace: {{ kiali_namespace }}
       spec:
         auth:
-          strategy: anonymous
+          strategy: token
         deployment:
           accessible_namespaces:
             - "**"
           view_only_mode: false
+          ingress:
+            enabled: false
         external_services:
           prometheus:
             url: "{{ prometheus_url }}"
@@ -61,3 +63,10 @@
   changed_when: false
   retries: 3
   delay: 30
+
+- name: Display Kiali login instructions
+  debug:
+    msg:
+      - "Kiali uses token authentication."
+      - "To get a login token, run:"
+      - "  kubectl -n {{ kiali_namespace }} create token kiali-service-account"

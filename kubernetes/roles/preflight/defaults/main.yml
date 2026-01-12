@@ -1,0 +1,8 @@
+---
+# Minimum requirements for Kubernetes nodes
+min_memory_mb: 2048
+min_disk_gb: 20
+min_cpu_cores: 2
+
+# Required kernel version (major.minor)
+min_kernel_version: "4.15"

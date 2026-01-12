@@ -7,7 +7,7 @@
       kind: HTTPRoute
       metadata:
         name: grafana
-        namespace: monitoring
+        namespace: {{ monitoring_namespace }}
       spec:
         parentRefs:
           - name: {{ gateway_name }}
@@ -33,7 +33,7 @@
       kind: HTTPRoute
       metadata:
         name: prometheus
-        namespace: monitoring
+        namespace: {{ monitoring_namespace }}
       spec:
         parentRefs:
           - name: {{ gateway_name }}
@@ -59,7 +59,7 @@
       kind: HTTPRoute
       metadata:
         name: alertmanager
-        namespace: monitoring
+        namespace: {{ monitoring_namespace }}
       spec:
         parentRefs:
           - name: {{ gateway_name }}
@@ -111,7 +111,7 @@
       kind: HTTPRoute
       metadata:
         name: kagent
-        namespace: kagent
+        namespace: {{ kagent_namespace }}
       spec:
         parentRefs:
           - name: {{ gateway_name }}

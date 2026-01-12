@@ -1,0 +1,52 @@
+---
+- name: Check minimum memory
+  fail:
+    msg: "Insufficient memory: {{ ansible_memtotal_mb }}MB available, {{ min_memory_mb }}MB required"
+  when: ansible_memtotal_mb < min_memory_mb
+
+- name: Check minimum CPU cores
+  fail:
+    msg: "Insufficient CPU cores: {{ ansible_processor_vcpus }} available, {{ min_cpu_cores }} required"
+  when: ansible_processor_vcpus < min_cpu_cores
+
+- name: Get root filesystem free space
+  shell: df -BG / | tail -1 | awk '{print $4}' | sed 's/G//'
+  register: root_free_space
+  changed_when: false
+
+- name: Check minimum disk space
+  fail:
+    msg: "Insufficient disk space: {{ root_free_space.stdout }}GB available, {{ min_disk_gb }}GB required"
+  when: root_free_space.stdout | int < min_disk_gb
+
+- name: Check kernel version
+  fail:
+    msg: "Kernel version {{ ansible_kernel }} is too old, minimum {{ min_kernel_version }} required"
+  when: ansible_kernel is version(min_kernel_version, '<')
+
+- name: Check if swap is disabled (or will be)
+  shell: swapon --show | wc -l
+  register: swap_status
+  changed_when: false
+
+- name: Warn if swap is enabled
+  debug:
+    msg: "WARNING: Swap is currently enabled and will be disabled during setup"
+  when: swap_status.stdout | int > 0
+
+- name: Verify network connectivity between nodes
+  wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    timeout: 10
+  loop: "{{ groups['k8s_cluster'] }}"
+  when: item != inventory_hostname
+
+- name: Display preflight check results
+  debug:
+    msg:
+      - "Preflight checks passed for {{ inventory_hostname }}"
+      - "  Memory: {{ ansible_memtotal_mb }}MB"
+      - "  CPUs: {{ ansible_processor_vcpus }}"
+      - "  Disk: {{ root_free_space.stdout }}GB free"
+      - "  Kernel: {{ ansible_kernel }}"

@@ -48,7 +48,10 @@
     --selector=app.kubernetes.io/name=kagent
     --timeout=300s
   changed_when: false
-  failed_when: false
+  register: kagent_controller_wait
+  retries: 2
+  delay: 30
+  until: kagent_controller_wait.rc == 0
 
 - name: Wait for kagent UI to be ready
   command: >
@@ -57,4 +60,7 @@
     --selector=app.kubernetes.io/component=ui
     --timeout=300s
   changed_when: false
-  failed_when: false
+  register: kagent_ui_wait
+  retries: 2
+  delay: 30
+  until: kagent_ui_wait.rc == 0

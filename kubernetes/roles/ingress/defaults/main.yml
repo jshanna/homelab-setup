@@ -2,6 +2,10 @@
 istio_namespace: istio-system
 gateway_name: homelab-gateway
 
+# Namespace references (should match other roles)
+monitoring_namespace: monitoring
+kagent_namespace: kagent
+
 # DNS hostnames - configure these in your local DNS
 grafana_hostname: grafana.homelab.local
 prometheus_hostname: prometheus.homelab.local

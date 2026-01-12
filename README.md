@@ -194,6 +194,14 @@ Add entries to your local DNS server or `/etc/hosts`:
 
 ## Roles
 
+### preflight
+
+Validates node requirements before installation:
+- Checks minimum memory (2GB), CPU cores (2), and disk space (20GB)
+- Verifies kernel version compatibility
+- Tests network connectivity between nodes
+- Warns if swap is enabled
+
 ### common
 
 Prepares nodes for Kubernetes:
@@ -237,7 +245,13 @@ Deploys kube-prometheus-stack:
 
 Deploys Kiali service mesh dashboard:
 - Installs Kiali operator
+- Configures token-based authentication (more secure than anonymous)
 - Configures integration with Prometheus and Grafana
+
+To login to Kiali, generate a token:
+```bash
+kubectl -n istio-system create token kiali-service-account
+```
 
 ### kagent
 

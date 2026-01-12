@@ -1,4 +1,11 @@
 ---
+- name: Run preflight checks
+  hosts: k8s_cluster
+  become: yes
+  gather_facts: yes
+  roles:
+    - preflight
+
 - name: Prepare all Kubernetes nodes
   hosts: k8s_cluster
   become: yes

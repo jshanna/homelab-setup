@@ -1,4 +1,9 @@
 ---
+- name: Validate Grafana admin password is set
+  fail:
+    msg: "grafana_admin_password must be set in group_vars/all.yml (do not use default 'changeme')"
+  when: grafana_admin_password is not defined or grafana_admin_password == "" or grafana_admin_password == "changeme"
+
 - name: Add Prometheus Community Helm repository
   command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
   register: helm_repo_result

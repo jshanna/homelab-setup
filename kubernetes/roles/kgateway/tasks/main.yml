@@ -45,4 +45,7 @@
     --selector=app.kubernetes.io/name=kgateway
     --timeout=300s
   changed_when: false
-  failed_when: false
+  register: kgateway_wait
+  retries: 2
+  delay: 30
+  until: kgateway_wait.rc == 0
