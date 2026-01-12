@@ -34,6 +34,7 @@ ansible-playbook kubernetes/site.yml --limit control_plane
 The setup uses two sequential playbooks:
 
 1. **site.yml** - Cluster provisioning
+   - `preflight` role validates node requirements (memory, CPU, disk, kernel, connectivity)
    - `common` role prepares all nodes (containerd, kubeadm, kernel params)
    - `kubernetes` role initializes control plane then joins workers
    - Join token is passed via `/tmp/kubeadm_join_command` local file

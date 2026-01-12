@@ -109,6 +109,7 @@ kubernetes/
 ├── group_vars/
 │   └── all.yml              # Global variables
 ├── roles/
+│   ├── preflight/           # Pre-installation validation checks
 │   ├── common/              # Base system setup (containerd, kubeadm)
 │   ├── kubernetes/          # Cluster initialization and node join
 │   ├── metallb/             # MetalLB load balancer
@@ -128,10 +129,11 @@ kubernetes/
 
 Provisions the base Kubernetes cluster:
 
-1. Prepares all nodes (disables swap, installs containerd, kubeadm)
-2. Initializes the control plane with Calico CNI
-3. Joins worker nodes to the cluster
-4. Installs local-path-provisioner for persistent storage
+1. Runs preflight checks (memory, CPU, disk, kernel, network connectivity)
+2. Prepares all nodes (disables swap, installs containerd, kubeadm)
+3. Initializes the control plane with Calico CNI
+4. Joins worker nodes to the cluster
+5. Installs local-path-provisioner for persistent storage
 
 ### services.yml
 
