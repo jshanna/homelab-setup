@@ -11,7 +11,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   kluster1   │  │   kluster2   │  │   kluster3   │          │
+│  │   homelab1   │  │   homelab2   │  │   homelab3   │          │
 │  │ Control Plane│  │    Worker    │  │    Worker    │          │
 │  │ 192.168.1.21 │  │ 192.168.1.22 │  │ 192.168.1.23 │          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
@@ -86,13 +86,13 @@ all:
       children:
         control_plane:
           hosts:
-            kluster1:
+            homelab1:
               ansible_host: 192.168.1.21
         workers:
           hosts:
-            kluster2:
+            homelab2:
               ansible_host: 192.168.1.22
-            kluster3:
+            homelab3:
               ansible_host: 192.168.1.23
 ```
 
