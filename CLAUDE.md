@@ -9,12 +9,14 @@ Ansible playbooks for provisioning a 3-node Kubernetes homelab cluster (1 contro
 ## Commands
 
 ```bash
-# Provision the base Kubernetes cluster
-cd kubernetes && ansible-playbook site.yml
+# Provision the base Kubernetes cluster (with password prompts)
+cd kubernetes && ansible-playbook site.yml --ask-pass --ask-become-pass
 
 # Deploy platform services (requires GEMINI_API_KEY for Kagent)
 export GEMINI_API_KEY="your-key"
-cd kubernetes && ansible-playbook services.yml
+cd kubernetes && ansible-playbook services.yml --ask-pass --ask-become-pass
+
+# If using SSH keys and passwordless sudo, omit --ask-pass --ask-become-pass
 
 # Check Ansible syntax
 ansible-playbook --syntax-check kubernetes/site.yml

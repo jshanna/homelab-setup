@@ -40,10 +40,31 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 
 ## Prerequisites
 
-- 3 Ubuntu/Debian servers with root SSH access
+- 3 Ubuntu/Debian servers with a sudo-enabled user
 - Ansible installed on your control machine
 - Network connectivity between all nodes
 - (Optional) GEMINI_API_KEY for Kagent
+
+### Node Setup
+
+Create an `ansible` user on each node with sudo privileges:
+
+```bash
+# On each node (as root)
+useradd -m -s /bin/bash ansible
+echo "ansible ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ansible
+passwd ansible  # Set a password for SSH access
+
+# Or for password-based sudo (more secure):
+echo "ansible ALL=(ALL) ALL" > /etc/sudoers.d/ansible
+```
+
+For passwordless operation, copy your SSH key:
+```bash
+ssh-copy-id ansible@192.168.1.21
+ssh-copy-id ansible@192.168.1.22
+ssh-copy-id ansible@192.168.1.23
+```
 
 ## Quick Start
 
@@ -87,6 +108,11 @@ Edit `group_vars/all.yml` to customize:
 
 ```bash
 cd kubernetes
+
+# With password prompts (SSH + sudo):
+ansible-playbook site.yml --ask-pass --ask-become-pass
+
+# Or if using SSH keys and passwordless sudo:
 ansible-playbook site.yml
 ```
 
@@ -94,6 +120,11 @@ ansible-playbook site.yml
 
 ```bash
 export GEMINI_API_KEY="your-api-key"  # Required for Kagent
+
+# With password prompts:
+ansible-playbook services.yml --ask-pass --ask-become-pass
+
+# Or if using SSH keys and passwordless sudo:
 ansible-playbook services.yml
 ```
 
