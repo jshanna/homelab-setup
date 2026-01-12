@@ -13,6 +13,9 @@
       - gnupg
       - lsb-release
       - software-properties-common
+      - conntrack
+      - socat
+      - ipset
     state: present
 
 - name: Disable swap
