@@ -18,6 +18,9 @@ cd kubernetes && ansible-playbook services.yml --ask-pass --ask-become-pass
 
 # If using SSH keys and passwordless sudo, omit --ask-pass --ask-become-pass
 
+# Reset/decommission the cluster (removes Kubernetes completely)
+cd kubernetes && ansible-playbook reset.yml --ask-pass --ask-become-pass
+
 # Check Ansible syntax
 ansible-playbook --syntax-check kubernetes/site.yml
 

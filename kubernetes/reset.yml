@@ -1,0 +1,98 @@
+---
+# Playbook to decommission/reset the Kubernetes cluster
+# This will completely remove Kubernetes and clean up all state
+#
+# Usage:
+#   ansible-playbook reset.yml --ask-pass --ask-become-pass
+
+- name: Reset Kubernetes cluster
+  hosts: k8s_cluster
+  become: yes
+  tasks:
+    - name: Check if kubeadm is installed
+      command: which kubeadm
+      register: kubeadm_check
+      failed_when: false
+      changed_when: false
+
+    - name: Reset kubeadm
+      command: kubeadm reset -f
+      when: kubeadm_check.rc == 0
+      register: reset_result
+      failed_when: false
+
+    - name: Unhold Kubernetes packages
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      failed_when: false
+
+    - name: Remove Kubernetes packages
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: absent
+        purge: yes
+      failed_when: false
+
+    - name: Remove Kubernetes directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /var/lib/etcd
+        - /var/lib/kubelet
+        - /etc/cni/net.d
+        - /var/lib/cni
+        - /opt/cni/bin
+        - /root/.kube
+
+    - name: Remove Kubernetes apt repository
+      file:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        state: absent
+
+    - name: Clean up iptables rules
+      shell: |
+        iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+      failed_when: false
+
+    - name: Clean up IPVS rules
+      shell: ipvsadm --clear
+      failed_when: false
+
+    - name: Restart containerd
+      systemd:
+        name: containerd
+        state: restarted
+      failed_when: false
+
+    - name: Display reset status
+      debug:
+        msg: "Kubernetes has been reset on {{ inventory_hostname }}"
+
+- name: Clean up local files
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+  tasks:
+    - name: Remove join command file
+      file:
+        path: /tmp/kubeadm_join_command
+        state: absent
+
+    - name: Display completion message
+      debug:
+        msg:
+          - "=========================================="
+          - "Cluster has been fully decommissioned"
+          - "Run 'ansible-playbook site.yml' to reinstall"
+          - "=========================================="

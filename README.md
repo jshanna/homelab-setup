@@ -135,6 +135,7 @@ kubernetes/
 ├── ansible.cfg              # Ansible configuration
 ├── site.yml                 # Main playbook - cluster provisioning
 ├── services.yml             # Services playbook - addon deployment
+├── reset.yml                # Decommission/reset the cluster
 ├── inventory/
 │   └── hosts.yml            # Node inventory
 ├── group_vars/
@@ -330,11 +331,16 @@ kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus
 
 ### Reset cluster
 
-On each node:
+Use the reset playbook to decommission the cluster:
 ```bash
-kubeadm reset -f
-rm -rf /etc/cni/net.d /var/lib/etcd /etc/kubernetes
+ansible-playbook reset.yml --ask-pass --ask-become-pass
 ```
+
+This will:
+- Run `kubeadm reset` on all nodes
+- Remove Kubernetes packages
+- Clean up all Kubernetes directories and state
+- Clear iptables rules
 
 ## References
 
