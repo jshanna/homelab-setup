@@ -46,8 +46,8 @@ kiali_version: "2.5.0"
 # ===========================================
 # Kagent Configuration
 # ===========================================
-kagent_provider: "anthropic"
-# Set ANTHROPIC_API_KEY environment variable before running
+kagent_provider: "gemini"
+# Set GEMINI_API_KEY environment variable before running
 
 # ===========================================
 # DNS Hostnames (configure in your local DNS)

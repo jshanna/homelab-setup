@@ -1,8 +1,8 @@
 ---
-- name: Check for Anthropic API key
+- name: Check for Gemini API key
   fail:
-    msg: "ANTHROPIC_API_KEY environment variable must be set"
-  when: kagent_provider == "anthropic" and (anthropic_api_key is not defined or anthropic_api_key == "")
+    msg: "GEMINI_API_KEY environment variable must be set"
+  when: kagent_provider == "gemini" and (gemini_api_key is not defined or gemini_api_key == "")
 
 - name: Create kagent namespace
   command: kubectl create namespace {{ kagent_namespace }}
@@ -32,14 +32,14 @@
   failed_when: false
   changed_when: false
 
-- name: Install kagent with Anthropic provider
+- name: Install kagent with Gemini provider
   command: >
     helm install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent
     --namespace {{ kagent_namespace }}
-    --set providers.default=anthropic
-    --set providers.anthropic.apiKey={{ anthropic_api_key }}
+    --set providers.default=gemini
+    --set providers.gemini.apiKey={{ gemini_api_key }}
     --wait --timeout 5m
-  when: kagent_status.rc != 0 and kagent_provider == "anthropic"
+  when: kagent_status.rc != 0 and kagent_provider == "gemini"
 
 - name: Wait for kagent controller to be ready
   command: >

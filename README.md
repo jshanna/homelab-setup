@@ -43,7 +43,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 - 3 Ubuntu/Debian servers with root SSH access
 - Ansible installed on your control machine
 - Network connectivity between all nodes
-- (Optional) ANTHROPIC_API_KEY for Kagent
+- (Optional) GEMINI_API_KEY for Kagent
 
 ## Quick Start
 
@@ -93,7 +93,7 @@ ansible-playbook site.yml
 ### 5. Deploy services
 
 ```bash
-export ANTHROPIC_API_KEY="your-api-key"  # Required for Kagent
+export GEMINI_API_KEY="your-api-key"  # Required for Kagent
 ansible-playbook services.yml
 ```
 
@@ -190,7 +190,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
 | `kiali_version` | 2.5.0 | Kiali version |
-| `kagent_provider` | anthropic | AI provider for Kagent |
+| `kagent_provider` | gemini | AI provider for Kagent |
 
 ## Roles
 
@@ -242,7 +242,7 @@ Deploys Kiali service mesh dashboard:
 ### kagent
 
 Deploys Kagent Kubernetes AI agent:
-- Requires ANTHROPIC_API_KEY environment variable
+- Requires GEMINI_API_KEY environment variable
 - Installs CRDs and controller
 - Deploys UI component
 

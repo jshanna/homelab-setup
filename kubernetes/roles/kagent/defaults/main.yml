@@ -2,7 +2,7 @@
 kagent_namespace: kagent
 
 # LLM Provider: openAI, anthropic, azureOpenAI, gemini, ollama
-kagent_provider: anthropic
+kagent_provider: gemini
 
 # API key - should be set via environment variable or vault
-# anthropic_api_key: ""
+# gemini_api_key: ""
