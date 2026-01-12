@@ -1,0 +1,114 @@
+---
+# Playbook for deploying base services to the Kubernetes cluster
+# Run after site.yml has provisioned the cluster
+#
+# Prerequisites:
+#   - Cluster provisioned with site.yml
+#   - ANTHROPIC_API_KEY environment variable set (for Kagent)
+#
+# Usage:
+#   export ANTHROPIC_API_KEY="your-api-key"
+#   ansible-playbook services.yml
+
+- name: Install Helm on control plane
+  hosts: control_plane
+  become: yes
+  tasks:
+    - name: Check if Helm is installed
+      command: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+
+    - name: Download Helm install script
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: '0700'
+      when: helm_check.rc != 0
+
+    - name: Install Helm
+      command: /tmp/get_helm.sh
+      when: helm_check.rc != 0
+
+- name: Deploy MetalLB
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - metallb
+
+- name: Deploy Istio (ambient mode)
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - istio
+
+- name: Deploy kube-prometheus-stack
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - prometheus
+
+- name: Deploy Kiali
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - kiali
+
+- name: Deploy Kagent
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  vars:
+    anthropic_api_key: "{{ lookup('env', 'ANTHROPIC_API_KEY') }}"
+  roles:
+    - kagent
+
+- name: Deploy kgateway (AgentGateway)
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - kgateway
+
+- name: Configure ingress routes
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - ingress
+
+- name: Final status check
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Get all pods
+      command: kubectl get pods -A
+      register: all_pods
+      changed_when: false
+
+    - name: Display pod status
+      debug:
+        msg: "{{ all_pods.stdout_lines }}"
+
+    - name: Get all services
+      command: kubectl get svc -A
+      register: all_services
+      changed_when: false
+
+    - name: Display services
+      debug:
+        msg: "{{ all_services.stdout_lines }}"

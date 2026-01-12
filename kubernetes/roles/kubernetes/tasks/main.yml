@@ -1,0 +1,8 @@
+---
+- name: Include control plane tasks
+  include_tasks: control-plane.yml
+  when: "'control_plane' in group_names"
+
+- name: Include worker tasks
+  include_tasks: worker.yml
+  when: "'workers' in group_names"

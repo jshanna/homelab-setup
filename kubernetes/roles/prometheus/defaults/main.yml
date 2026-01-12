@@ -1,0 +1,7 @@
+---
+prometheus_namespace: monitoring
+prometheus_stack_version: "68.4.5"
+
+grafana_admin_password: "admin"  # Override in group_vars or vault!
+prometheus_retention: "15d"
+prometheus_storage_size: "50Gi"

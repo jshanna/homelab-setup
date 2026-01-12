@@ -1,0 +1,7 @@
+---
+kiali_namespace: istio-system
+kiali_version: "2.5.0"
+
+prometheus_url: "http://kube-prometheus-stack-prometheus.monitoring:9090"
+grafana_url: "http://kube-prometheus-stack-grafana.monitoring:80"
+grafana_external_url: "http://grafana.homelab.local"

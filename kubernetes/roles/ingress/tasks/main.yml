@@ -1,0 +1,158 @@
+---
+- name: Create HTTPRoute for Grafana
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: grafana
+        namespace: monitoring
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ grafana_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: kube-prometheus-stack-grafana
+                port: 80
+  register: grafana_route
+  changed_when: "'created' in grafana_route.stdout or 'configured' in grafana_route.stdout"
+
+- name: Create HTTPRoute for Prometheus
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: prometheus
+        namespace: monitoring
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ prometheus_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: kube-prometheus-stack-prometheus
+                port: 9090
+  register: prometheus_route
+  changed_when: "'created' in prometheus_route.stdout or 'configured' in prometheus_route.stdout"
+
+- name: Create HTTPRoute for Alertmanager
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: alertmanager
+        namespace: monitoring
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ alertmanager_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: kube-prometheus-stack-alertmanager
+                port: 9093
+  register: alertmanager_route
+  changed_when: "'created' in alertmanager_route.stdout or 'configured' in alertmanager_route.stdout"
+
+- name: Create HTTPRoute for Kiali
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: kiali
+        namespace: {{ istio_namespace }}
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ kiali_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: kiali
+                port: 20001
+  register: kiali_route
+  changed_when: "'created' in kiali_route.stdout or 'configured' in kiali_route.stdout"
+
+- name: Create HTTPRoute for Kagent
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: kagent
+        namespace: kagent
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ kagent_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: kagent-ui
+                port: 8080
+  register: kagent_route
+  changed_when: "'created' in kagent_route.stdout or 'configured' in kagent_route.stdout"
+
+- name: Get Gateway external IP
+  command: >
+    kubectl get gateway {{ gateway_name }} -n {{ istio_namespace }}
+    -o jsonpath='{.status.addresses[0].value}'
+  register: gateway_ip
+  changed_when: false
+
+- name: Display access information
+  debug:
+    msg:
+      - "=========================================="
+      - "Gateway IP: {{ gateway_ip.stdout }}"
+      - "=========================================="
+      - "Configure these DNS entries in your local DNS:"
+      - "  {{ grafana_hostname }}     -> {{ gateway_ip.stdout }}"
+      - "  {{ prometheus_hostname }}  -> {{ gateway_ip.stdout }}"
+      - "  {{ alertmanager_hostname }} -> {{ gateway_ip.stdout }}"
+      - "  {{ kiali_hostname }}       -> {{ gateway_ip.stdout }}"
+      - "  {{ kagent_hostname }}      -> {{ gateway_ip.stdout }}"
+      - "=========================================="
+      - "Access URLs:"
+      - "  Grafana:      http://{{ grafana_hostname }}"
+      - "  Prometheus:   http://{{ prometheus_hostname }}"
+      - "  Alertmanager: http://{{ alertmanager_hostname }}"
+      - "  Kiali:        http://{{ kiali_hostname }}"
+      - "  Kagent:       http://{{ kagent_hostname }}"
+      - "=========================================="

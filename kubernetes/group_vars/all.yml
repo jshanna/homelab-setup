@@ -1,0 +1,59 @@
+---
+# ===========================================
+# Kubernetes Cluster Configuration
+# ===========================================
+
+# Kubernetes version (major.minor)
+kubernetes_version: "1.34"
+
+# Container runtime
+containerd_version: "2.0.*"
+
+# Network configuration
+pod_network_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12"
+
+# CNI plugin: calico or flannel
+cni_plugin: "calico"
+
+# Cluster name
+cluster_name: "homelab-cluster"
+
+# ===========================================
+# MetalLB Configuration
+# ===========================================
+metallb_ip_range: "192.168.1.24-192.168.1.29"
+metallb_pool_name: "homelab-pool"
+
+# ===========================================
+# Istio Configuration
+# ===========================================
+istio_version: "1.24.2"
+istio_profile: "ambient"
+
+# ===========================================
+# Monitoring (Prometheus/Grafana)
+# ===========================================
+grafana_admin_password: "changeme"  # Change this!
+prometheus_retention: "15d"
+prometheus_storage_size: "50Gi"
+
+# ===========================================
+# Kiali Configuration
+# ===========================================
+kiali_version: "2.5.0"
+
+# ===========================================
+# Kagent Configuration
+# ===========================================
+kagent_provider: "anthropic"
+# Set ANTHROPIC_API_KEY environment variable before running
+
+# ===========================================
+# DNS Hostnames (configure in your local DNS)
+# ===========================================
+grafana_hostname: "grafana.homelab.local"
+prometheus_hostname: "prometheus.homelab.local"
+alertmanager_hostname: "alertmanager.homelab.local"
+kiali_hostname: "kiali.homelab.local"
+kagent_hostname: "kagent.homelab.local"

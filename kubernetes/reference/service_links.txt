@@ -1,0 +1,6 @@
+Istio - https://github.com/istio/istio
+Prometheus - https://github.com/prometheus/prometheus
+Grafana - https://github.com/grafana/grafana
+Kiala - https://github.com/kiali/kiali
+Kagent - https://github.com/kagent-dev/kagent
+AgentGateway - https://github.com/agentgateway/agentgateway

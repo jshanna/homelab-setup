@@ -1,0 +1,60 @@
+---
+- name: Check for Anthropic API key
+  fail:
+    msg: "ANTHROPIC_API_KEY environment variable must be set"
+  when: kagent_provider == "anthropic" and (anthropic_api_key is not defined or anthropic_api_key == "")
+
+- name: Create kagent namespace
+  command: kubectl create namespace {{ kagent_namespace }}
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
+
+- name: Label kagent namespace for Istio ambient
+  command: kubectl label namespace {{ kagent_namespace }} istio.io/dataplane-mode=ambient --overwrite
+  changed_when: false
+
+- name: Check if kagent CRDs are installed
+  command: helm status kagent-crds -n {{ kagent_namespace }}
+  register: kagent_crds_status
+  failed_when: false
+  changed_when: false
+
+- name: Install kagent CRDs
+  command: >
+    helm install kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds
+    --namespace {{ kagent_namespace }}
+  when: kagent_crds_status.rc != 0
+
+- name: Check if kagent is installed
+  command: helm status kagent -n {{ kagent_namespace }}
+  register: kagent_status
+  failed_when: false
+  changed_when: false
+
+- name: Install kagent with Anthropic provider
+  command: >
+    helm install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent
+    --namespace {{ kagent_namespace }}
+    --set providers.default=anthropic
+    --set providers.anthropic.apiKey={{ anthropic_api_key }}
+    --wait --timeout 5m
+  when: kagent_status.rc != 0 and kagent_provider == "anthropic"
+
+- name: Wait for kagent controller to be ready
+  command: >
+    kubectl wait --namespace {{ kagent_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=kagent
+    --timeout=300s
+  changed_when: false
+  failed_when: false
+
+- name: Wait for kagent UI to be ready
+  command: >
+    kubectl wait --namespace {{ kagent_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/component=ui
+    --timeout=300s
+  changed_when: false
+  failed_when: false

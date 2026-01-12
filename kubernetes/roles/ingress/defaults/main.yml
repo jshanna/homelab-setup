@@ -1,0 +1,10 @@
+---
+istio_namespace: istio-system
+gateway_name: homelab-gateway
+
+# DNS hostnames - configure these in your local DNS
+grafana_hostname: grafana.homelab.local
+prometheus_hostname: prometheus.homelab.local
+alertmanager_hostname: alertmanager.homelab.local
+kiali_hostname: kiali.homelab.local
+kagent_hostname: kagent.homelab.local

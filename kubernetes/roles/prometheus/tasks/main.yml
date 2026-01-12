@@ -1,0 +1,81 @@
+---
+- name: Add Prometheus Community Helm repository
+  command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  register: helm_repo_result
+  changed_when: "'has been added' in helm_repo_result.stdout"
+  failed_when: false
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false
+
+- name: Create monitoring namespace
+  command: kubectl create namespace {{ prometheus_namespace }}
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
+
+- name: Label monitoring namespace for Istio ambient
+  command: kubectl label namespace {{ prometheus_namespace }} istio.io/dataplane-mode=ambient --overwrite
+  changed_when: false
+
+- name: Check if kube-prometheus-stack is installed
+  command: helm status kube-prometheus-stack -n {{ prometheus_namespace }}
+  register: prometheus_status
+  failed_when: false
+  changed_when: false
+
+- name: Create Prometheus values file
+  copy:
+    dest: /tmp/prometheus-values.yaml
+    content: |
+      grafana:
+        adminPassword: "{{ grafana_admin_password }}"
+        service:
+          type: ClusterIP
+      prometheus:
+        prometheusSpec:
+          retention: {{ prometheus_retention }}
+          storageSpec:
+            volumeClaimTemplate:
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: {{ prometheus_storage_size }}
+          podMonitorSelectorNilUsesHelmValues: false
+          serviceMonitorSelectorNilUsesHelmValues: false
+      alertmanager:
+        alertmanagerSpec:
+          storage:
+            volumeClaimTemplate:
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 10Gi
+
+- name: Install kube-prometheus-stack
+  command: >
+    helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+    --namespace {{ prometheus_namespace }}
+    --version {{ prometheus_stack_version }}
+    --values /tmp/prometheus-values.yaml
+    --wait --timeout 10m
+  when: prometheus_status.rc != 0
+
+- name: Wait for Prometheus to be ready
+  command: >
+    kubectl wait --namespace {{ prometheus_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=prometheus
+    --timeout=300s
+  changed_when: false
+
+- name: Wait for Grafana to be ready
+  command: >
+    kubectl wait --namespace {{ prometheus_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=grafana
+    --timeout=300s
+  changed_when: false

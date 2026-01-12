@@ -1,0 +1,48 @@
+---
+- name: Create kgateway namespace
+  command: kubectl create namespace {{ kgateway_namespace }}
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
+
+- name: Label kgateway namespace for Istio ambient
+  command: kubectl label namespace {{ kgateway_namespace }} istio.io/dataplane-mode=ambient --overwrite
+  changed_when: false
+
+- name: Check if kgateway CRDs are installed
+  command: helm status kgateway-crds -n {{ kgateway_namespace }}
+  register: kgateway_crds_status
+  failed_when: false
+  changed_when: false
+
+- name: Install kgateway CRDs
+  command: >
+    helm upgrade -i kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
+    --namespace {{ kgateway_namespace }}
+    --version {{ kgateway_version }}
+  when: kgateway_crds_status.rc != 0
+
+- name: Check if kgateway is installed
+  command: helm status kgateway -n {{ kgateway_namespace }}
+  register: kgateway_status
+  failed_when: false
+  changed_when: false
+
+- name: Install kgateway with agentgateway enabled
+  command: >
+    helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
+    --namespace {{ kgateway_namespace }}
+    --version {{ kgateway_version }}
+    --set agentgateway.enabled={{ agentgateway_enabled }}
+    --set controller.image.pullPolicy=Always
+    --wait --timeout 5m
+  when: kgateway_status.rc != 0
+
+- name: Wait for kgateway controller to be ready
+  command: >
+    kubectl wait --namespace {{ kgateway_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=kgateway
+    --timeout=300s
+  changed_when: false
+  failed_when: false

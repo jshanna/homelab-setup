@@ -1,0 +1,74 @@
+---
+- name: Check if cluster is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_init
+
+- name: Initialize Kubernetes control plane
+  command: >
+    kubeadm init
+    --pod-network-cidr={{ pod_network_cidr }}
+    --service-cidr={{ service_cidr }}
+  when: not kubeadm_init.stat.exists
+  register: kubeadm_init_result
+
+- name: Create .kube directory for root
+  file:
+    path: /root/.kube
+    state: directory
+    mode: '0755'
+
+- name: Copy admin.conf to root's .kube directory
+  copy:
+    src: "{{ kubeconfig_path }}"
+    dest: /root/.kube/config
+    remote_src: yes
+    mode: '0600'
+
+- name: Install Calico CNI
+  command: kubectl apply -f {{ calico_manifest }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+
+- name: Wait for control plane to be ready
+  command: kubectl get nodes
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: nodes_result
+  until: "'Ready' in nodes_result.stdout"
+  retries: 30
+  delay: 10
+  when: kubeadm_init_result is changed
+
+- name: Generate join command
+  command: kubeadm token create --print-join-command
+  register: join_command_result
+  changed_when: false
+
+- name: Store join command
+  set_fact:
+    kubeadm_join_command: "{{ join_command_result.stdout }}"
+
+- name: Save join command to local file
+  copy:
+    content: "{{ kubeadm_join_command }}"
+    dest: /tmp/kubeadm_join_command
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+
+- name: Install local-path-provisioner for persistent storage
+  command: kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: local_path_result
+  changed_when: "'created' in local_path_result.stdout or 'configured' in local_path_result.stdout"
+
+- name: Set local-path as default StorageClass
+  command: >
+    kubectl patch storageclass local-path
+    -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false

@@ -1,0 +1,45 @@
+---
+- name: Prepare all Kubernetes nodes
+  hosts: k8s_cluster
+  become: yes
+  roles:
+    - common
+
+- name: Initialize control plane
+  hosts: control_plane
+  become: yes
+  serial: 1
+  roles:
+    - kubernetes
+
+- name: Join worker nodes
+  hosts: workers
+  become: yes
+  roles:
+    - kubernetes
+
+- name: Verify cluster status
+  hosts: control_plane
+  become: yes
+  tasks:
+    - name: Get cluster nodes
+      command: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: cluster_nodes
+      changed_when: false
+
+    - name: Display cluster status
+      debug:
+        msg: "{{ cluster_nodes.stdout_lines }}"
+
+    - name: Get cluster pods
+      command: kubectl get pods -A
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: cluster_pods
+      changed_when: false
+
+    - name: Display pods status
+      debug:
+        msg: "{{ cluster_pods.stdout_lines }}"

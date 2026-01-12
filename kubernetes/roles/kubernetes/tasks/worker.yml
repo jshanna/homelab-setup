@@ -1,0 +1,17 @@
+---
+- name: Check if node has already joined
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Read join command from local file
+  slurp:
+    src: /tmp/kubeadm_join_command
+  delegate_to: localhost
+  become: false
+  register: join_command_file
+  when: not kubelet_conf.stat.exists
+
+- name: Join cluster
+  command: "{{ join_command_file.content | b64decode }}"
+  when: not kubelet_conf.stat.exists

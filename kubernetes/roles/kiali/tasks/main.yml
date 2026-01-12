@@ -1,0 +1,63 @@
+---
+- name: Add Kiali Helm repository
+  command: helm repo add kiali https://kiali.org/helm-charts
+  register: helm_repo_result
+  changed_when: "'has been added' in helm_repo_result.stdout"
+  failed_when: false
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false
+
+- name: Check if Kiali operator is installed
+  command: helm status kiali-operator -n kiali-operator
+  register: kiali_status
+  failed_when: false
+  changed_when: false
+
+- name: Install Kiali operator
+  command: >
+    helm install kiali-operator kiali/kiali-operator
+    --namespace kiali-operator
+    --create-namespace
+    --version {{ kiali_version }}
+    --wait
+  when: kiali_status.rc != 0
+
+- name: Create Kiali CR
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: kiali.io/v1alpha1
+      kind: Kiali
+      metadata:
+        name: kiali
+        namespace: {{ kiali_namespace }}
+      spec:
+        auth:
+          strategy: anonymous
+        deployment:
+          accessible_namespaces:
+            - "**"
+          view_only_mode: false
+        external_services:
+          prometheus:
+            url: "{{ prometheus_url }}"
+          grafana:
+            enabled: true
+            in_cluster_url: "{{ grafana_url }}"
+            url: "{{ grafana_external_url }}"
+        server:
+          web_root: "/"
+  register: kiali_cr_result
+  changed_when: "'created' in kiali_cr_result.stdout or 'configured' in kiali_cr_result.stdout"
+
+- name: Wait for Kiali to be ready
+  command: >
+    kubectl wait --namespace {{ kiali_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=kiali
+    --timeout=300s
+  changed_when: false
+  retries: 3
+  delay: 30
