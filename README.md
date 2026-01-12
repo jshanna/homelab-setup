@@ -28,7 +28,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Component | Version | Description |
 |-----------|---------|-------------|
 | Kubernetes | 1.34 | Container orchestration platform |
-| containerd | 2.0.x | Container runtime |
+| containerd | 1.7.x | Container runtime |
 | Calico | latest | CNI plugin for pod networking |
 | MetalLB | 0.14.x | Bare-metal load balancer |
 | Istio | 1.24.2 | Service mesh (ambient mode) |
@@ -212,7 +212,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `kubernetes_version` | 1.34 | Kubernetes minor version |
-| `containerd_version` | 2.0.* | containerd version |
+| `containerd_version` | 1.7.* | containerd version |
 | `pod_network_cidr` | 10.244.0.0/16 | Pod network CIDR |
 | `service_cidr` | 10.96.0.0/12 | Service network CIDR |
 | `cni_plugin` | calico | CNI plugin (calico/flannel) |

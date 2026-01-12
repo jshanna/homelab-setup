@@ -7,7 +7,7 @@
 kubernetes_version: "1.34"
 
 # Container runtime
-containerd_version: "2.0.*"
+containerd_version: "1.7.*"
 
 # Network configuration
 pod_network_cidr: "10.244.0.0/16"
