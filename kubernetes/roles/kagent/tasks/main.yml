@@ -66,7 +66,7 @@
 - name: Check if kagent-grafana-mcp secret has valid token
   shell: >
     kubectl get secret -n {{ kagent_namespace }} kagent-grafana-mcp
-    -o jsonpath='{.data.GRAFANA_API_KEY}' 2>/dev/null | base64 -d
+    -o jsonpath='{.data.GRAFANA_SERVICE_ACCOUNT_TOKEN}' 2>/dev/null | base64 -d
   register: existing_grafana_token
   changed_when: false
   failed_when: false
@@ -191,7 +191,7 @@
 - name: Patch kagent-grafana-mcp Secret with API token
   shell: |
     kubectl patch secret kagent-grafana-mcp -n {{ kagent_namespace }} \
-      --type=merge -p '{"stringData":{"GRAFANA_API_KEY":"{{ kagent_grafana_token }}"}}'
+      --type=merge -p '{"stringData":{"GRAFANA_SERVICE_ACCOUNT_TOKEN":"{{ kagent_grafana_token }}"}}'
   when:
     - grafana_mcp_wait.rc == 0
     - kagent_grafana_token is defined
