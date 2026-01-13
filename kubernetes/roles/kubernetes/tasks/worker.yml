@@ -1,4 +1,7 @@
 ---
+# Worker node join tasks
+# Aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
+
 - name: Check if node has already joined
   stat:
     path: /etc/kubernetes/kubelet.conf
@@ -15,18 +18,3 @@
 - name: Join cluster
   command: "{{ join_command_file.content | b64decode }}"
   when: not kubelet_conf.stat.exists
-  register: join_result
-
-- name: Wait for Calico CNI to be installed on worker
-  wait_for:
-    path: /etc/cni/net.d/calico-kubeconfig
-    state: present
-    timeout: 120
-  when: join_result is changed and cni_plugin == "calico"
-
-- name: Fix Calico kubeconfig IPv6 bracket bug on worker
-  replace:
-    path: /etc/cni/net.d/calico-kubeconfig
-    regexp: 'https://\[(\d+\.\d+\.\d+\.\d+)\]:'
-    replace: 'https://\1:'
-  when: cni_plugin == "calico"

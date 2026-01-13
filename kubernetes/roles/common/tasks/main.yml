@@ -1,4 +1,7 @@
 ---
+# Common tasks for all Kubernetes nodes
+# Aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
+
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -11,12 +14,14 @@
       - ca-certificates
       - curl
       - gnupg
-      - lsb-release
-      - software-properties-common
       - conntrack
       - socat
       - ipset
     state: present
+
+# ===========================================
+# Disable Swap
+# ===========================================
 
 - name: Disable swap
   command: swapoff -a
@@ -28,6 +33,10 @@
     regexp: '.*swap.*'
     state: absent
   when: disable_swap
+
+# ===========================================
+# Kernel Modules
+# ===========================================
 
 - name: Load kernel modules
   modprobe:
@@ -43,6 +52,10 @@
       {{ module }}
       {% endfor %}
 
+# ===========================================
+# Sysctl Parameters
+# ===========================================
+
 - name: Set sysctl parameters
   sysctl:
     name: "{{ item.key }}"
@@ -51,22 +64,21 @@
     reload: yes
   loop: "{{ sysctl_params | dict2items }}"
 
-- name: Add Docker GPG key
-  apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+# ===========================================
+# Container Runtime (containerd via docker.io)
+# ===========================================
 
-- name: Add Docker repository
-  apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    state: present
-    filename: docker
-
-- name: Install containerd
+- name: Install docker.io (includes containerd)
   apt:
-    name: "containerd.io={{ containerd_version }}"
+    name: docker.io
     state: present
     update_cache: yes
+
+- name: Enable and start Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
 
 - name: Create containerd config directory
   file:
@@ -77,21 +89,12 @@
   shell: containerd config default > /etc/containerd/config.toml
   args:
     creates: /etc/containerd/config.toml
-  notify: Restart containerd
-
-- name: Enable CRI plugin (remove disabled_plugins line)
-  lineinfile:
-    path: /etc/containerd/config.toml
-    regexp: '^\s*disabled_plugins\s*='
-    state: absent
-  notify: Restart containerd
 
 - name: Configure containerd to use systemd cgroup
-  lineinfile:
+  replace:
     path: /etc/containerd/config.toml
-    regexp: '^\s*SystemdCgroup\s*='
-    line: '            SystemdCgroup = true'
-    insertafter: '.*\[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options\]'
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
   notify: Restart containerd
 
 - name: Flush handlers to restart containerd now
@@ -109,16 +112,35 @@
     state: present
     timeout: 30
 
-- name: Add Kubernetes GPG key
-  apt_key:
-    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key"
-    state: present
+# ===========================================
+# Kubernetes Repository (modern GPG handling)
+# ===========================================
+
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Kubernetes GPG key
+  shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 - name: Add Kubernetes repository
-  apt_repository:
-    repo: "deb https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /"
-    state: present
-    filename: kubernetes
+  copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: |
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /
+
+- name: Update apt cache after adding Kubernetes repo
+  apt:
+    update_cache: yes
+
+# ===========================================
+# Kubernetes Packages
+# ===========================================
 
 - name: Install Kubernetes packages
   apt:
@@ -127,7 +149,6 @@
       - kubeadm
       - kubectl
     state: present
-    update_cache: yes
 
 - name: Hold Kubernetes packages
   dpkg_selections:

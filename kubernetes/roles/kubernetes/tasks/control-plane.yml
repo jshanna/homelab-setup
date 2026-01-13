@@ -1,4 +1,7 @@
 ---
+# Control plane initialization
+# Aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
+
 - name: Check if cluster is already initialized
   stat:
     path: /etc/kubernetes/admin.conf
@@ -11,6 +14,10 @@
     --service-cidr={{ service_cidr }}
   when: not kubeadm_init.stat.exists
   register: kubeadm_init_result
+
+# ===========================================
+# Setup kubeconfig for root user
+# ===========================================
 
 - name: Create .kube directory for root
   file:
@@ -25,27 +32,64 @@
     remote_src: yes
     mode: '0600'
 
-- name: Download Calico manifest
-  get_url:
-    url: "{{ calico_manifest }}"
-    dest: /tmp/calico.yaml
-    mode: '0644'
-  when: cni_plugin == "calico" and kubeadm_init_result is changed
+# ===========================================
+# Setup kubeconfig for ansible user
+# ===========================================
 
-- name: Patch Calico manifest to set explicit KUBERNETES_SERVICE_HOST
-  shell: |
-    sed -i '/- name: CLUSTER_TYPE/a\            - name: KUBERNETES_SERVICE_HOST\n              value: "10.96.0.1"\n            - name: KUBERNETES_SERVICE_PORT\n              value: "443"' /tmp/calico.yaml
-  when: cni_plugin == "calico" and kubeadm_init_result is changed
+- name: Create .kube directory for ansible user
+  file:
+    path: /home/ansible/.kube
+    state: directory
+    owner: ansible
+    group: ansible
+    mode: '0755'
 
-- name: Install Calico CNI
-  command: kubectl apply -f /tmp/calico.yaml
+- name: Copy admin.conf to ansible user's .kube directory
+  copy:
+    src: "{{ kubeconfig_path }}"
+    dest: /home/ansible/.kube/config
+    remote_src: yes
+    owner: ansible
+    group: ansible
+    mode: '0600'
+
+# ===========================================
+# Install Calico CNI via Tigera Operator
+# ===========================================
+
+- name: Install Tigera operator
+  command: kubectl create -f {{ tigera_operator_url }}
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   when: cni_plugin == "calico" and kubeadm_init_result is changed
+  register: tigera_result
+  failed_when: tigera_result.rc != 0 and 'already exists' not in tigera_result.stderr
 
-- name: Wait for Calico node pods to be running
+- name: Download Calico custom resources
+  get_url:
+    url: "{{ calico_custom_resources_url }}"
+    dest: /tmp/calico-custom-resources.yaml
+    mode: '0644'
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+
+- name: Update pod network CIDR in custom resources
+  replace:
+    path: /tmp/calico-custom-resources.yaml
+    regexp: 'cidr: 192\.168\.0\.0/16'
+    replace: 'cidr: {{ pod_network_cidr }}'
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+
+- name: Apply Calico custom resources
+  command: kubectl create -f /tmp/calico-custom-resources.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+  register: calico_cr_result
+  failed_when: calico_cr_result.rc != 0 and 'already exists' not in calico_cr_result.stderr
+
+- name: Wait for Calico pods to be ready
   command: >
-    kubectl wait --namespace kube-system
+    kubectl wait --namespace calico-system
     --for=condition=ready pod
     --selector=k8s-app=calico-node
     --timeout=300s
@@ -53,17 +97,13 @@
     KUBECONFIG: "{{ kubeconfig_path }}"
   when: cni_plugin == "calico" and kubeadm_init_result is changed
   retries: 3
-  delay: 10
+  delay: 30
   register: calico_wait
   until: calico_wait.rc == 0
 
-- name: Fix Calico kubeconfig IPv6 bracket bug
-  replace:
-    path: /etc/cni/net.d/calico-kubeconfig
-    regexp: 'https://\[(\d+\.\d+\.\d+\.\d+)\]:'
-    replace: 'https://\1:'
-  when: cni_plugin == "calico"
-  register: calico_kubeconfig_fix
+# ===========================================
+# Wait for control plane
+# ===========================================
 
 - name: Wait for control plane to be ready
   command: kubectl get nodes
@@ -74,6 +114,10 @@
   retries: 30
   delay: 10
   when: kubeadm_init_result is changed
+
+# ===========================================
+# Generate join command for workers
+# ===========================================
 
 - name: Generate join command
   command: kubeadm token create --print-join-command
@@ -91,6 +135,10 @@
     mode: '0600'
   delegate_to: localhost
   become: false
+
+# ===========================================
+# Install local-path-provisioner for storage
+# ===========================================
 
 - name: Install local-path-provisioner for persistent storage
   command: kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.30/deploy/local-path-storage.yaml

@@ -1,6 +1,5 @@
 ---
 kubernetes_version: "1.31"
-containerd_version: "1.7.*"
 
 disable_swap: true
 

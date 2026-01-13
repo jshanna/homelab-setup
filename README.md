@@ -28,8 +28,8 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Component | Version | Description |
 |-----------|---------|-------------|
 | Kubernetes | 1.31 | Container orchestration platform |
-| containerd | 1.7.x | Container runtime |
-| Calico | latest | CNI plugin for pod networking |
+| containerd | (via docker.io) | Container runtime |
+| Calico | 3.28.0 | CNI plugin via Tigera operator |
 | MetalLB | 0.14.x | Bare-metal load balancer |
 | Istio | 1.24.2 | Service mesh (ambient mode) |
 | Prometheus | latest | Metrics collection and alerting |
@@ -246,10 +246,9 @@ Add entries to your local DNS server or `/etc/hosts`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `kubernetes_version` | 1.31 | Kubernetes minor version |
-| `containerd_version` | 1.7.* | containerd version |
-| `pod_network_cidr` | 10.244.0.0/16 | Pod network CIDR |
+| `pod_network_cidr` | 10.10.0.0/16 | Pod network CIDR |
 | `service_cidr` | 10.96.0.0/12 | Service network CIDR |
-| `cni_plugin` | calico | CNI plugin (calico/flannel) |
+| `cni_plugin` | calico | CNI plugin (calico) |
 | `metallb_ip_range` | 192.168.1.24-192.168.1.29 | MetalLB IP pool |
 | `istio_version` | 1.24.2 | Istio version |
 | `istio_profile` | ambient | Istio installation profile |
@@ -276,13 +275,14 @@ Prepares nodes for Kubernetes:
 - Disables swap
 - Configures kernel modules (overlay, br_netfilter)
 - Sets sysctl parameters for networking
-- Installs and configures containerd
+- Installs docker.io (includes containerd)
+- Configures containerd with systemd cgroup
 - Installs kubeadm, kubelet, kubectl
 
 ### kubernetes
 
 Initializes cluster and joins nodes:
-- **Control plane**: Runs `kubeadm init`, installs Calico CNI, sets up local-path-provisioner
+- **Control plane**: Runs `kubeadm init`, installs Calico via Tigera operator, sets up local-path-provisioner
 - **Workers**: Joins nodes using token from control plane
 
 ### metallb

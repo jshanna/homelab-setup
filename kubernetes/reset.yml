@@ -86,13 +86,14 @@
         - kubectl
       failed_when: false
 
-    - name: Remove Kubernetes and containerd packages
+    - name: Remove Kubernetes and container runtime packages
       apt:
         name:
           - kubelet
           - kubeadm
           - kubectl
-          - containerd.io
+          - docker.io
+          - containerd
         state: absent
         purge: yes
       failed_when: false
@@ -133,7 +134,7 @@
         - /var/run/calico
       failed_when: false
 
-    - name: Remove containerd directories
+    - name: Remove container runtime directories
       file:
         path: "{{ item }}"
         state: absent
@@ -141,6 +142,8 @@
         - /etc/containerd
         - /var/lib/containerd
         - /run/containerd
+        - /var/lib/docker
+        - /etc/docker
       failed_when: false
 
     # ===========================================
@@ -152,22 +155,10 @@
         path: /etc/apt/sources.list.d/kubernetes.list
         state: absent
 
-    - name: Remove Docker apt repository (used for containerd)
+    - name: Remove Kubernetes GPG key (modern location)
       file:
-        path: /etc/apt/sources.list.d/docker.list
+        path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
         state: absent
-
-    - name: Remove Kubernetes GPG key
-      apt_key:
-        url: "https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key"
-        state: absent
-      failed_when: false
-
-    - name: Remove Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: absent
-      failed_when: false
 
     # ===========================================
     # Phase 7: Remove kernel/sysctl configuration

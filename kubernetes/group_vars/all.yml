@@ -6,11 +6,8 @@
 # Kubernetes version (major.minor)
 kubernetes_version: "1.31"
 
-# Container runtime
-containerd_version: "1.7.*"
-
 # Network configuration
-pod_network_cidr: "10.244.0.0/16"
+pod_network_cidr: "10.10.0.0/16"
 service_cidr: "10.96.0.0/12"
 
 # CNI plugin: calico or flannel
