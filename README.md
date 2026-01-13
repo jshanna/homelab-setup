@@ -31,10 +31,10 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | containerd | (via docker.io) | Container runtime |
 | Calico | 3.28.0 | CNI plugin via Tigera operator |
 | MetalLB | 0.14.x | Bare-metal load balancer |
-| Istio | 1.24.2 | Service mesh (ambient mode) |
+| Istio | 1.27.1 | Service mesh (ambient mode) |
 | Prometheus | latest | Metrics collection and alerting |
 | Grafana | latest | Metrics visualization |
-| Kiali | 2.5.0 | Istio service mesh observability |
+| Kiali | 2.7.0 | Istio service mesh observability |
 | Kagent | latest | Kubernetes AI agent |
 | kgateway | latest | Agent gateway for AI workloads |
 
@@ -250,7 +250,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `service_cidr` | 10.96.0.0/12 | Service network CIDR |
 | `cni_plugin` | calico | CNI plugin (calico) |
 | `metallb_ip_range` | 192.168.1.24-192.168.1.29 | MetalLB IP pool |
-| `istio_version` | 1.24.2 | Istio version |
+| `istio_version` | 1.27.1 | Istio version |
 | `istio_profile` | ambient | Istio installation profile |
 | `grafana_admin_password` | changeme | Grafana admin password |
 | `prometheus_retention` | 15d | Prometheus data retention |

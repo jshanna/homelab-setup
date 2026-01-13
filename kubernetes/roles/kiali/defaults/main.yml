@@ -1,6 +1,7 @@
 ---
 kiali_namespace: istio-system
-kiali_version: "2.5.0"
+# Updated for Istio 1.27 compatibility
+kiali_version: "2.7.0"
 
 # Authentication strategy: token (requires SA token to login)
 # To get a login token, run:

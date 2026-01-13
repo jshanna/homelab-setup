@@ -25,7 +25,8 @@ metallb_pool_name: "homelab-pool"
 # ===========================================
 # Istio Configuration
 # ===========================================
-istio_version: "1.24.2"
+# Istio 1.27 supports K8s 1.30-1.34, includes Gateway API v1.4.0
+istio_version: "1.27.1"
 istio_profile: "ambient"
 
 # ===========================================
