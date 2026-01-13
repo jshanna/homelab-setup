@@ -105,6 +105,16 @@ When making changes to this repository:
 - Verify version compatibility when updating any component (check upstream docs)
 - **Commit and push changes** after completing modifications - don't leave uncommitted work
 
+## Playbook Guidelines
+
+**All playbook changes must be idempotent.** Running the playbook multiple times should produce the same result as running it once:
+- Use `helm upgrade -i` instead of `helm install`
+- Use `kubectl apply` instead of `kubectl create` (or handle "already exists" errors)
+- Use `kubectl patch` for updating existing resources managed by Helm
+- Check if resources/tokens exist before creating new ones
+- Only restart deployments when configuration actually changes
+- Use `changed_when` and `failed_when` conditions appropriately
+
 ## Reference Guide
 
 Playbook aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
