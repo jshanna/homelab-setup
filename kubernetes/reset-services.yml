@@ -1,0 +1,252 @@
+---
+# Playbook to remove all services deployed by services.yml
+# This removes only the services, leaving the base Kubernetes cluster intact
+#
+# Usage:
+#   ansible-playbook reset-services.yml --ask-pass --ask-become-pass
+#
+# This playbook removes (in reverse order of installation):
+#   - Ingress routes (HTTPRoutes)
+#   - Kagent and kgateway
+#   - Kiali
+#   - kube-prometheus-stack (Prometheus/Grafana)
+#   - Istio service mesh
+#   - MetalLB load balancer
+#   - Gateway API CRDs
+#   - Helm repositories
+#   - Helm and istioctl binaries (optional, disabled by default)
+
+- name: Reset services deployed by services.yml
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  vars:
+    # Set to true to also remove Helm and istioctl binaries
+    remove_binaries: false
+    # Namespaces (should match role defaults)
+    metallb_namespace: metallb-system
+    istio_namespace: istio-system
+    prometheus_namespace: monitoring
+    kagent_namespace: kagent
+    kgateway_namespace: kgateway-system
+    gateway_name: homelab-gateway
+
+  tasks:
+    # ===========================================
+    # Phase 1: Remove ingress routes
+    # ===========================================
+
+    - name: Remove HTTPRoutes
+      command: kubectl delete httproute {{ item.name }} -n {{ item.namespace }}
+      loop:
+        - { name: grafana, namespace: monitoring }
+        - { name: prometheus, namespace: monitoring }
+        - { name: alertmanager, namespace: monitoring }
+        - { name: kiali, namespace: istio-system }
+        - { name: kagent, namespace: kagent }
+      failed_when: false
+
+    # ===========================================
+    # Phase 2: Remove Kagent
+    # ===========================================
+
+    - name: Uninstall kagent Helm release
+      command: helm uninstall kagent -n {{ kagent_namespace }}
+      failed_when: false
+
+    - name: Uninstall kagent-crds Helm release
+      command: helm uninstall kagent-crds -n {{ kagent_namespace }}
+      failed_when: false
+
+    - name: Delete kagent namespace
+      command: kubectl delete namespace {{ kagent_namespace }} --timeout=60s
+      failed_when: false
+
+    # ===========================================
+    # Phase 3: Remove kgateway
+    # ===========================================
+
+    - name: Uninstall kgateway Helm release
+      command: helm uninstall kgateway -n {{ kgateway_namespace }}
+      failed_when: false
+
+    - name: Uninstall kgateway-crds Helm release
+      command: helm uninstall kgateway-crds -n {{ kgateway_namespace }}
+      failed_when: false
+
+    - name: Delete kgateway namespace
+      command: kubectl delete namespace {{ kgateway_namespace }} --timeout=60s
+      failed_when: false
+
+    # ===========================================
+    # Phase 4: Remove Kiali
+    # ===========================================
+
+    - name: Delete Kiali CR
+      command: kubectl delete kiali kiali -n {{ istio_namespace }}
+      failed_when: false
+
+    - name: Wait for Kiali CR deletion
+      command: kubectl wait --for=delete kiali/kiali -n {{ istio_namespace }} --timeout=60s
+      failed_when: false
+
+    - name: Uninstall kiali-operator Helm release
+      command: helm uninstall kiali-operator -n kiali-operator
+      failed_when: false
+
+    - name: Delete kiali-operator namespace
+      command: kubectl delete namespace kiali-operator --timeout=60s
+      failed_when: false
+
+    # ===========================================
+    # Phase 5: Remove kube-prometheus-stack
+    # ===========================================
+
+    - name: Uninstall kube-prometheus-stack Helm release
+      command: helm uninstall kube-prometheus-stack -n {{ prometheus_namespace }}
+      failed_when: false
+
+    - name: Delete Prometheus CRDs
+      command: kubectl delete crd {{ item }}
+      loop:
+        - alertmanagerconfigs.monitoring.coreos.com
+        - alertmanagers.monitoring.coreos.com
+        - podmonitors.monitoring.coreos.com
+        - probes.monitoring.coreos.com
+        - prometheusagents.monitoring.coreos.com
+        - prometheuses.monitoring.coreos.com
+        - prometheusrules.monitoring.coreos.com
+        - scrapeconfigs.monitoring.coreos.com
+        - servicemonitors.monitoring.coreos.com
+        - thanosrulers.monitoring.coreos.com
+      failed_when: false
+
+    - name: Delete monitoring namespace
+      command: kubectl delete namespace {{ prometheus_namespace }} --timeout=60s
+      failed_when: false
+
+    - name: Remove Prometheus values file
+      file:
+        path: /tmp/prometheus-values.yaml
+        state: absent
+
+    # ===========================================
+    # Phase 6: Remove Istio
+    # ===========================================
+
+    - name: Delete Istio Gateway
+      command: kubectl delete gateway {{ gateway_name }} -n {{ istio_namespace }}
+      failed_when: false
+
+    - name: Check if istioctl is installed
+      command: which istioctl
+      register: istioctl_check
+      failed_when: false
+      changed_when: false
+
+    - name: Uninstall Istio
+      command: istioctl uninstall --purge -y
+      when: istioctl_check.rc == 0
+      failed_when: false
+
+    - name: Delete istio-system namespace
+      command: kubectl delete namespace {{ istio_namespace }} --timeout=120s
+      failed_when: false
+
+    - name: Remove Gateway API CRDs
+      command: kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+      failed_when: false
+
+    # ===========================================
+    # Phase 7: Remove MetalLB
+    # ===========================================
+
+    - name: Uninstall MetalLB Helm release
+      command: helm uninstall metallb -n {{ metallb_namespace }}
+      failed_when: false
+
+    - name: Delete MetalLB namespace
+      command: kubectl delete namespace {{ metallb_namespace }} --timeout=60s
+      failed_when: false
+
+    # ===========================================
+    # Phase 8: Clean up Helm repositories
+    # ===========================================
+
+    - name: Remove Helm repositories
+      command: helm repo remove {{ item }}
+      loop:
+        - metallb
+        - prometheus-community
+        - kiali
+      failed_when: false
+
+    # ===========================================
+    # Phase 9: Remove binaries (optional)
+    # ===========================================
+
+    - name: Remove istioctl binary
+      file:
+        path: /usr/local/bin/istioctl
+        state: absent
+      when: remove_binaries
+
+    - name: Remove Helm binary
+      file:
+        path: /usr/local/bin/helm
+        state: absent
+      when: remove_binaries
+
+    - name: Remove Helm install script
+      file:
+        path: /tmp/get_helm.sh
+        state: absent
+
+    - name: Remove istioctl archive
+      file:
+        path: /tmp/istioctl.tar.gz
+        state: absent
+
+    # ===========================================
+    # Phase 10: Verify cleanup
+    # ===========================================
+
+    - name: Get remaining namespaces
+      command: kubectl get namespaces
+      register: remaining_ns
+      changed_when: false
+
+    - name: Display remaining namespaces
+      debug:
+        msg: "{{ remaining_ns.stdout_lines }}"
+
+    - name: Get remaining pods
+      command: kubectl get pods -A
+      register: remaining_pods
+      changed_when: false
+
+    - name: Display remaining pods
+      debug:
+        msg: "{{ remaining_pods.stdout_lines }}"
+
+    - name: Display completion message
+      debug:
+        msg:
+          - "=========================================="
+          - "Services have been removed"
+          - "The base Kubernetes cluster is still intact"
+          - ""
+          - "Removed:"
+          - "  - Ingress routes (HTTPRoutes)"
+          - "  - Kagent"
+          - "  - kgateway"
+          - "  - Kiali"
+          - "  - kube-prometheus-stack"
+          - "  - Istio"
+          - "  - MetalLB"
+          - "  - Gateway API CRDs"
+          - "  - Helm repositories"
+          - ""
+          - "Run 'ansible-playbook services.yml' to reinstall"
+          - "=========================================="

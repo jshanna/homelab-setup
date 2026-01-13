@@ -25,11 +25,45 @@
     remote_src: yes
     mode: '0600'
 
+- name: Download Calico manifest
+  get_url:
+    url: "{{ calico_manifest }}"
+    dest: /tmp/calico.yaml
+    mode: '0644'
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+
+- name: Patch Calico manifest to set explicit KUBERNETES_SERVICE_HOST
+  shell: |
+    sed -i '/- name: CLUSTER_TYPE/a\            - name: KUBERNETES_SERVICE_HOST\n              value: "10.96.0.1"\n            - name: KUBERNETES_SERVICE_PORT\n              value: "443"' /tmp/calico.yaml
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+
 - name: Install Calico CNI
-  command: kubectl apply -f {{ calico_manifest }}
+  command: kubectl apply -f /tmp/calico.yaml
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   when: cni_plugin == "calico" and kubeadm_init_result is changed
+
+- name: Wait for Calico node pods to be running
+  command: >
+    kubectl wait --namespace kube-system
+    --for=condition=ready pod
+    --selector=k8s-app=calico-node
+    --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: cni_plugin == "calico" and kubeadm_init_result is changed
+  retries: 3
+  delay: 10
+  register: calico_wait
+  until: calico_wait.rc == 0
+
+- name: Fix Calico kubeconfig IPv6 bracket bug
+  replace:
+    path: /etc/cni/net.d/calico-kubeconfig
+    regexp: 'https://\[(\d+\.\d+\.\d+\.\d+)\]:'
+    replace: 'https://\1:'
+  when: cni_plugin == "calico"
+  register: calico_kubeconfig_fix
 
 - name: Wait for control plane to be ready
   command: kubectl get nodes

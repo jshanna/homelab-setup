@@ -135,7 +135,8 @@ kubernetes/
 ├── ansible.cfg              # Ansible configuration
 ├── site.yml                 # Main playbook - cluster provisioning
 ├── services.yml             # Services playbook - addon deployment
-├── reset.yml                # Decommission/reset the cluster
+├── reset.yml                # Decommission/reset the entire cluster
+├── reset-services.yml       # Remove services only (keep cluster)
 ├── inventory/
 │   └── hosts.yml            # Node inventory
 ├── group_vars/
@@ -179,6 +180,38 @@ Deploys platform services on top of the cluster:
 6. Deploys Kagent (AI agent for Kubernetes)
 7. Deploys kgateway (AgentGateway)
 8. Configures ingress routes via Istio Gateway
+
+### reset-services.yml
+
+Removes all services deployed by services.yml while keeping the base cluster intact:
+
+1. Removes ingress routes (HTTPRoutes)
+2. Removes Kagent and kgateway
+3. Removes Kiali operator and CR
+4. Removes kube-prometheus-stack and CRDs
+5. Uninstalls Istio and Gateway API CRDs
+6. Removes MetalLB
+7. Cleans up Helm repositories
+
+```bash
+ansible-playbook reset-services.yml --ask-pass --ask-become-pass
+```
+
+### reset.yml
+
+Completely decommissions the cluster, removing everything installed by site.yml:
+
+1. Stops and resets kubeadm
+2. Removes all containers and pods
+3. Removes Kubernetes and containerd packages
+4. Cleans up all directories and state
+5. Removes apt repositories and GPG keys
+6. Removes kernel module and sysctl configurations
+7. Cleans up iptables and network interfaces
+
+```bash
+ansible-playbook reset.yml --ask-pass --ask-become-pass
+```
 
 ## Accessing Services
 
@@ -329,18 +362,19 @@ kubectl logs -n istio-system -l app=istiod
 kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus
 ```
 
-### Reset cluster
+### Reset services or cluster
 
-Use the reset playbook to decommission the cluster:
+To remove only services (keep base cluster):
+```bash
+ansible-playbook reset-services.yml --ask-pass --ask-become-pass
+```
+
+To completely decommission the cluster:
 ```bash
 ansible-playbook reset.yml --ask-pass --ask-become-pass
 ```
 
-This will:
-- Run `kubeadm reset` on all nodes
-- Remove Kubernetes packages
-- Clean up all Kubernetes directories and state
-- Clear iptables rules
+See the [Playbooks](#playbooks) section for details on what each reset playbook removes.
 
 ## References
 

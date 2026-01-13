@@ -1,14 +1,31 @@
 ---
 # Playbook to decommission/reset the Kubernetes cluster
-# This will completely remove Kubernetes and clean up all state
+# This will completely remove Kubernetes, containerd, and all related state
 #
 # Usage:
 #   ansible-playbook reset.yml --ask-pass --ask-become-pass
+#
+# This playbook removes everything installed by site.yml:
+#   - Kubernetes packages and state
+#   - containerd and its configuration
+#   - CNI plugins and network configuration
+#   - Kernel module and sysctl configurations
+#   - apt repositories and GPG keys
 
 - name: Reset Kubernetes cluster
   hosts: k8s_cluster
   become: yes
   tasks:
+    # ===========================================
+    # Phase 1: Stop services and reset kubeadm
+    # ===========================================
+
+    - name: Stop kubelet service
+      systemd:
+        name: kubelet
+        state: stopped
+      failed_when: false
+
     - name: Check if kubeadm is installed
       command: which kubeadm
       register: kubeadm_check
@@ -16,10 +33,48 @@
       changed_when: false
 
     - name: Reset kubeadm
-      command: kubeadm reset -f
+      command: kubeadm reset -f --cri-socket unix:///var/run/containerd/containerd.sock
       when: kubeadm_check.rc == 0
-      register: reset_result
       failed_when: false
+
+    # ===========================================
+    # Phase 2: Stop and remove all containers
+    # ===========================================
+
+    - name: Stop all running containers
+      shell: |
+        crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock ps -q | xargs -r crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock stop
+      failed_when: false
+
+    - name: Remove all containers
+      shell: |
+        crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock ps -a -q | xargs -r crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock rm
+      failed_when: false
+
+    - name: Remove all pods
+      shell: |
+        crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock pods -q | xargs -r crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock rmp
+      failed_when: false
+
+    # ===========================================
+    # Phase 3: Stop containerd
+    # ===========================================
+
+    - name: Stop containerd service
+      systemd:
+        name: containerd
+        state: stopped
+      failed_when: false
+
+    - name: Disable containerd service
+      systemd:
+        name: containerd
+        enabled: no
+      failed_when: false
+
+    # ===========================================
+    # Phase 4: Remove packages
+    # ===========================================
 
     - name: Unhold Kubernetes packages
       dpkg_selections:
@@ -31,52 +86,159 @@
         - kubectl
       failed_when: false
 
-    - name: Remove Kubernetes packages
+    - name: Remove Kubernetes and containerd packages
       apt:
         name:
           - kubelet
           - kubeadm
           - kubectl
+          - containerd.io
         state: absent
         purge: yes
       failed_when: false
+
+    - name: Autoremove unused dependencies
+      apt:
+        autoremove: yes
+      failed_when: false
+
+    # ===========================================
+    # Phase 5: Remove all directories and state
+    # ===========================================
 
     - name: Remove Kubernetes directories
       file:
         path: "{{ item }}"
         state: absent
       loop:
+        # Kubernetes state
         - /etc/kubernetes
-        - /var/lib/etcd
         - /var/lib/kubelet
-        - /etc/cni/net.d
+        - /var/lib/etcd
+        # CNI state
+        - /etc/cni
         - /var/lib/cni
-        - /opt/cni/bin
+        - /opt/cni
+        # kubeconfig files
         - /root/.kube
+        - /home/ansible/.kube
+        # local-path-provisioner data
+        - /opt/local-path-provisioner
+
+    # Calico directories may have extended attributes that prevent normal removal
+    - name: Remove Calico directories (force)
+      shell: rm -rf {{ item }}
+      loop:
+        - /var/lib/calico
+        - /var/run/calico
+      failed_when: false
+
+    - name: Remove containerd directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/containerd
+        - /var/lib/containerd
+        - /run/containerd
+      failed_when: false
+
+    # ===========================================
+    # Phase 6: Remove apt repositories and keys
+    # ===========================================
 
     - name: Remove Kubernetes apt repository
       file:
         path: /etc/apt/sources.list.d/kubernetes.list
         state: absent
 
+    - name: Remove Docker apt repository (used for containerd)
+      file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+
+    - name: Remove Kubernetes GPG key
+      apt_key:
+        url: "https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key"
+        state: absent
+      failed_when: false
+
+    - name: Remove Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: absent
+      failed_when: false
+
+    # ===========================================
+    # Phase 7: Remove kernel/sysctl configuration
+    # ===========================================
+
+    - name: Remove kernel modules configuration
+      file:
+        path: /etc/modules-load.d/k8s.conf
+        state: absent
+
+    - name: Remove sysctl configuration
+      file:
+        path: /etc/sysctl.d/k8s.conf
+        state: absent
+
+    - name: Reload sysctl
+      command: sysctl --system
+      failed_when: false
+
+    # ===========================================
+    # Phase 8: Clean up networking
+    # ===========================================
+
     - name: Clean up iptables rules
       shell: |
-        iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+        iptables -F
+        iptables -t nat -F
+        iptables -t mangle -F
+        iptables -t raw -F
+        iptables -X
+        iptables -t nat -X
+        iptables -t mangle -X
+        iptables -t raw -X
+      failed_when: false
+
+    - name: Clean up ip6tables rules
+      shell: |
+        ip6tables -F
+        ip6tables -t nat -F
+        ip6tables -t mangle -F
+        ip6tables -t raw -F
+        ip6tables -X
+        ip6tables -t nat -X
+        ip6tables -t mangle -X
+        ip6tables -t raw -X
       failed_when: false
 
     - name: Clean up IPVS rules
       shell: ipvsadm --clear
       failed_when: false
 
-    - name: Restart containerd
-      systemd:
-        name: containerd
-        state: restarted
+    - name: Remove CNI network interfaces
+      shell: |
+        ip link delete cni0 2>/dev/null || true
+        ip link delete flannel.1 2>/dev/null || true
+        ip link delete vxlan.calico 2>/dev/null || true
+        ip link delete tunl0 2>/dev/null || true
+      failed_when: false
+
+    # ===========================================
+    # Phase 9: Update apt cache
+    # ===========================================
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
       failed_when: false
 
     - name: Display reset status
       debug:
-        msg: "Kubernetes has been reset on {{ inventory_hostname }}"
+        msg: "Kubernetes and containerd have been completely removed from {{ inventory_hostname }}"
 
 - name: Clean up local files
   hosts: localhost
@@ -94,5 +256,12 @@
         msg:
           - "=========================================="
           - "Cluster has been fully decommissioned"
+          - "All components removed:"
+          - "  - Kubernetes (kubelet, kubeadm, kubectl)"
+          - "  - containerd"
+          - "  - CNI plugins and network state"
+          - "  - Kernel module and sysctl configs"
+          - "  - apt repositories and GPG keys"
+          - ""
           - "Run 'ansible-playbook site.yml' to reinstall"
           - "=========================================="

@@ -5,7 +5,7 @@ cluster_name: "homelab-cluster"
 
 cni_plugin: "calico"
 
-calico_version: "v3.31.2"
+calico_version: "v3.28.2"
 calico_manifest: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
 
 kubeconfig_path: /etc/kubernetes/admin.conf
