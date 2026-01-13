@@ -115,6 +115,18 @@ When making changes to this repository:
 - Only restart deployments when configuration actually changes
 - Use `changed_when` and `failed_when` conditions appropriately
 
+## Kagent Grafana MCP Configuration
+
+The kagent role must configure the Grafana MCP integration automatically:
+
+1. **Wait for Grafana** to be ready (handled by prometheus role)
+2. **Create service account** via Grafana API: `POST /api/serviceaccounts` with `{"name": "kagent", "role": "Admin"}`
+3. **Create token** for the service account: `POST /api/serviceaccounts/{id}/tokens` with `{"name": "kagent-mcp"}`
+4. **Store token** in secret `kagent-grafana-mcp` with key `GRAFANA_SERVICE_ACCOUNT_TOKEN`
+5. **Restart deployment** `kagent-grafana-mcp` to pick up the new token
+
+The playbook uses Ansible's `uri` module to call the Grafana API via ClusterIP (control plane has cluster network access). Token generation is skipped if a valid token already exists in the secret.
+
 ## Reference Guide
 
 Playbook aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
