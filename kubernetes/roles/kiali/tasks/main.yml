@@ -9,20 +9,13 @@
   command: helm repo update
   changed_when: false
 
-- name: Check if Kiali operator is installed
-  command: helm status kiali-operator -n kiali-operator
-  register: kiali_status
-  failed_when: false
-  changed_when: false
-
-- name: Install Kiali operator
+- name: Install/upgrade Kiali operator
   command: >
-    helm install kiali-operator kiali/kiali-operator
+    helm upgrade -i kiali-operator kiali/kiali-operator
     --namespace kiali-operator
     --create-namespace
     --version {{ kiali_version }}
     --wait
-  when: kiali_status.rc != 0
 
 - name: Create Kiali CR
   command: kubectl apply -f -
@@ -37,8 +30,7 @@
         auth:
           strategy: token
         deployment:
-          accessible_namespaces:
-            - "**"
+          # cluster_wide_access defaults to true, giving access to all namespaces
           view_only_mode: false
           ingress:
             enabled: false
@@ -46,9 +38,7 @@
           prometheus:
             url: "{{ prometheus_url }}"
           grafana:
-            enabled: true
-            in_cluster_url: "{{ grafana_url }}"
-            url: "{{ grafana_external_url }}"
+            enabled: false
         server:
           web_root: "/"
   register: kiali_cr_result

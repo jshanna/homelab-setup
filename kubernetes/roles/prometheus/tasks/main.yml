@@ -20,16 +20,6 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
-- name: Label monitoring namespace for Istio ambient
-  command: kubectl label namespace {{ prometheus_namespace }} istio.io/dataplane-mode=ambient --overwrite
-  changed_when: false
-
-- name: Check if kube-prometheus-stack is installed
-  command: helm status kube-prometheus-stack -n {{ prometheus_namespace }}
-  register: prometheus_status
-  failed_when: false
-  changed_when: false
-
 - name: Create Prometheus values file
   copy:
     dest: /tmp/prometheus-values.yaml
@@ -60,14 +50,13 @@
                   requests:
                     storage: 10Gi
 
-- name: Install kube-prometheus-stack
+- name: Install/upgrade kube-prometheus-stack
   command: >
-    helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+    helm upgrade -i kube-prometheus-stack prometheus-community/kube-prometheus-stack
     --namespace {{ prometheus_namespace }}
     --version {{ prometheus_stack_version }}
     --values /tmp/prometheus-values.yaml
     --wait --timeout 10m
-  when: prometheus_status.rc != 0
 
 - name: Wait for Prometheus to be ready
   command: >
@@ -84,3 +73,57 @@
     --selector=app.kubernetes.io/name=grafana
     --timeout=300s
   changed_when: false
+
+# ===========================================
+# Istio monitoring (ServiceMonitor/PodMonitor)
+# ===========================================
+
+- name: Create ServiceMonitor for istiod
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: istiod
+        namespace: istio-system
+        labels:
+          app: istiod
+      spec:
+        selector:
+          matchLabels:
+            app: istiod
+        namespaceSelector:
+          matchNames:
+            - istio-system
+        endpoints:
+          - port: http-monitoring
+            interval: 30s
+            path: /metrics
+  register: istiod_monitor
+  changed_when: "'created' in istiod_monitor.stdout or 'configured' in istiod_monitor.stdout"
+
+- name: Create PodMonitor for ztunnel (ambient mode)
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: monitoring.coreos.com/v1
+      kind: PodMonitor
+      metadata:
+        name: ztunnel
+        namespace: istio-system
+        labels:
+          app: ztunnel
+      spec:
+        selector:
+          matchLabels:
+            app: ztunnel
+        namespaceSelector:
+          matchNames:
+            - istio-system
+        podMetricsEndpoints:
+          - port: ztunnel-stats
+            interval: 30s
+            path: /metrics
+  register: ztunnel_monitor
+  changed_when: "'created' in ztunnel_monitor.stdout or 'configured' in ztunnel_monitor.stdout"

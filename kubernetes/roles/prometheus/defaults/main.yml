@@ -1,7 +1,7 @@
 ---
 prometheus_namespace: monitoring
-# Updated to recent stable version
-prometheus_stack_version: "72.6.2"
+# Verified available version from prometheus-community helm repo
+prometheus_stack_version: "72.6.4"
 
 # grafana_admin_password must be set in group_vars/all.yml or via vault
 prometheus_retention: "15d"

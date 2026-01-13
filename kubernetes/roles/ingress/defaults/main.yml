@@ -5,6 +5,7 @@ gateway_name: homelab-gateway
 # Namespace references (should match other roles)
 monitoring_namespace: monitoring
 kagent_namespace: kagent
+kgateway_namespace: kgateway-system
 
 # DNS hostnames - configure these in your local DNS
 grafana_hostname: grafana.homelab.local
@@ -12,3 +13,4 @@ prometheus_hostname: prometheus.homelab.local
 alertmanager_hostname: alertmanager.homelab.local
 kiali_hostname: kiali.homelab.local
 kagent_hostname: kagent.homelab.local
+agentgateway_hostname: agentgateway.homelab.local

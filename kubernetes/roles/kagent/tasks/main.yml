@@ -10,36 +10,20 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
-- name: Label kagent namespace for Istio ambient
-  command: kubectl label namespace {{ kagent_namespace }} istio.io/dataplane-mode=ambient --overwrite
-  changed_when: false
-
-- name: Check if kagent CRDs are installed
-  command: helm status kagent-crds -n {{ kagent_namespace }}
-  register: kagent_crds_status
-  failed_when: false
-  changed_when: false
-
-- name: Install kagent CRDs
+- name: Install/upgrade kagent CRDs
   command: >
-    helm install kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds
+    helm upgrade -i kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds
     --namespace {{ kagent_namespace }}
-  when: kagent_crds_status.rc != 0
 
-- name: Check if kagent is installed
-  command: helm status kagent -n {{ kagent_namespace }}
-  register: kagent_status
-  failed_when: false
-  changed_when: false
-
-- name: Install kagent with Gemini provider
+- name: Install/upgrade kagent with Gemini provider
   command: >
-    helm install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent
+    helm upgrade -i kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent
     --namespace {{ kagent_namespace }}
     --set providers.default=gemini
     --set providers.gemini.apiKey={{ gemini_api_key }}
+    --set grafana-mcp.config.GRAFANA_URL={{ grafana_url }}
     --wait --timeout 5m
-  when: kagent_status.rc != 0 and kagent_provider == "gemini"
+  when: kagent_provider == "gemini"
 
 - name: Wait for kagent controller to be ready
   command: >
@@ -64,3 +48,164 @@
   retries: 2
   delay: 30
   until: kagent_ui_wait.rc == 0
+
+# ===========================================
+# Configure kagent-grafana-mcp
+# ===========================================
+
+- name: Wait for kagent-grafana-mcp to be ready
+  command: >
+    kubectl wait --namespace {{ kagent_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=kagent-grafana-mcp
+    --timeout=300s
+  changed_when: false
+  failed_when: false
+  register: grafana_mcp_wait
+
+- name: Check if kagent-grafana-mcp secret has valid token
+  shell: >
+    kubectl get secret -n {{ kagent_namespace }} kagent-grafana-mcp
+    -o jsonpath='{.data.GRAFANA_API_KEY}' 2>/dev/null | base64 -d
+  register: existing_grafana_token
+  changed_when: false
+  failed_when: false
+  when: grafana_mcp_wait.rc == 0
+
+- name: Set token generation flag
+  set_fact:
+    need_grafana_token: "{{ existing_grafana_token.stdout | default('') | length < 10 }}"
+  when: grafana_mcp_wait.rc == 0
+
+- name: Get Grafana admin password
+  shell: >
+    kubectl get secret -n {{ monitoring_namespace }} {{ grafana_service }}
+    -o jsonpath='{.data.admin-password}' | base64 -d
+  register: grafana_admin_password
+  changed_when: false
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+
+- name: Check if kagent service account exists in Grafana
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -u "admin:{{ grafana_admin_password.stdout }}" \
+      "{{ grafana_url }}/api/serviceaccounts/search?query=kagent"
+  register: grafana_sa_check
+  changed_when: false
+  failed_when: false
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+
+- name: Create Grafana service account for kagent
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -X POST "{{ grafana_url }}/api/serviceaccounts" \
+      -H "Content-Type: application/json" \
+      -u "admin:{{ grafana_admin_password.stdout }}" \
+      -d '{"name": "kagent", "role": "Admin"}'
+  register: grafana_sa_create
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - grafana_sa_check.stdout is defined
+    - (grafana_sa_check.stdout | from_json).serviceAccounts | length == 0
+  failed_when: false
+
+- name: Get kagent service account ID
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -u "admin:{{ grafana_admin_password.stdout }}" \
+      "{{ grafana_url }}/api/serviceaccounts/search?query=kagent"
+  register: grafana_sa_info
+  changed_when: false
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+
+- name: Parse service account ID
+  set_fact:
+    kagent_sa_id: "{{ (grafana_sa_info.stdout | from_json).serviceAccounts[0].id }}"
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - grafana_sa_info.stdout is defined
+    - (grafana_sa_info.stdout | from_json).serviceAccounts | length > 0
+
+- name: Get existing tokens for kagent service account
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -u "admin:{{ grafana_admin_password.stdout }}" \
+      "{{ grafana_url }}/api/serviceaccounts/{{ kagent_sa_id }}/tokens"
+  register: existing_tokens
+  changed_when: false
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - kagent_sa_id is defined
+
+- name: Delete existing tokens for kagent service account
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -X DELETE -u "admin:{{ grafana_admin_password.stdout }}" \
+      "{{ grafana_url }}/api/serviceaccounts/{{ kagent_sa_id }}/tokens/{{ item.id }}"
+  loop: "{{ (existing_tokens.stdout | from_json) | default([]) }}"
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - kagent_sa_id is defined
+    - existing_tokens.stdout is defined
+    - (existing_tokens.stdout | from_json) | length > 0
+  failed_when: false
+
+- name: Create Grafana API token for kagent
+  shell: |
+    kubectl run grafana-api-{{ lookup('pipe', 'date +%s') }} --rm -i --restart=Never \
+      --image=curlimages/curl:latest --quiet -- \
+      -s -X POST "{{ grafana_url }}/api/serviceaccounts/{{ kagent_sa_id }}/tokens" \
+      -H "Content-Type: application/json" \
+      -u "admin:{{ grafana_admin_password.stdout }}" \
+      -d '{"name": "kagent-mcp"}'
+  register: grafana_token_create
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - kagent_sa_id is defined
+
+- name: Parse API token
+  set_fact:
+    kagent_grafana_token: "{{ (grafana_token_create.stdout | from_json).key }}"
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | bool
+    - grafana_token_create.stdout is defined
+    - "'key' in (grafana_token_create.stdout | from_json)"
+
+- name: Patch kagent-grafana-mcp Secret with API token
+  shell: |
+    kubectl patch secret kagent-grafana-mcp -n {{ kagent_namespace }} \
+      --type=merge -p '{"stringData":{"GRAFANA_API_KEY":"{{ kagent_grafana_token }}"}}'
+  when:
+    - grafana_mcp_wait.rc == 0
+    - kagent_grafana_token is defined
+
+- name: Restart kagent-grafana-mcp deployment
+  command: kubectl rollout restart deployment kagent-grafana-mcp -n {{ kagent_namespace }}
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | default(false) | bool
+
+- name: Wait for kagent-grafana-mcp restart to complete
+  command: >
+    kubectl rollout status deployment kagent-grafana-mcp -n {{ kagent_namespace }} --timeout=120s
+  when:
+    - grafana_mcp_wait.rc == 0
+    - need_grafana_token | default(false) | bool
+  changed_when: false

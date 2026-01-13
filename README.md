@@ -30,13 +30,13 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Kubernetes | 1.31 | Container orchestration platform |
 | containerd | (via docker.io) | Container runtime |
 | Calico | 3.28.0 | CNI plugin via Tigera operator |
-| MetalLB | 0.14.x | Bare-metal load balancer |
+| MetalLB | 0.14.9 | Bare-metal load balancer |
 | Istio | 1.27.1 | Service mesh (ambient mode) |
-| Prometheus | latest | Metrics collection and alerting |
-| Grafana | latest | Metrics visualization |
-| Kiali | 2.7.0 | Istio service mesh observability |
+| Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
+| Grafana | (via kube-prometheus-stack) | Metrics visualization |
+| Kiali | 2.20.0 | Istio service mesh observability |
 | Kagent | latest | Kubernetes AI agent |
-| kgateway | latest | Agent gateway for AI workloads |
+| kgateway | v2.1.2 | Agent gateway for AI workloads |
 
 ## Prerequisites
 
@@ -224,6 +224,7 @@ After deployment, configure DNS entries pointing to the gateway IP:
 | Alertmanager | http://alertmanager.homelab.local | 80 |
 | Kiali | http://kiali.homelab.local | 80 |
 | Kagent | http://kagent.homelab.local | 80 |
+| AgentGateway | http://agentgateway.homelab.local/ui | 80 |
 
 The gateway IP is assigned by MetalLB from the configured pool (192.168.1.24-29).
 
@@ -237,6 +238,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 192.168.1.24  alertmanager.homelab.local
 192.168.1.24  kiali.homelab.local
 192.168.1.24  kagent.homelab.local
+192.168.1.24  agentgateway.homelab.local
 ```
 
 ## Configuration Reference
@@ -255,7 +257,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `grafana_admin_password` | changeme | Grafana admin password |
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
-| `kiali_version` | 2.5.0 | Kiali version |
+| `kiali_version` | 2.20.0 | Kiali version (2.12+ required for Istio 1.27) |
 | `kagent_provider` | gemini | AI provider for Kagent |
 
 ## Roles
@@ -299,6 +301,7 @@ Deploys Istio service mesh in ambient mode:
 - Installs Gateway API CRDs
 - Deploys Istio with ambient profile
 - Creates ingress gateway
+- Labels namespaces for ambient mode (excludes kube-system, istio-system, kgateway-system)
 
 ### prometheus
 
@@ -326,12 +329,15 @@ Deploys Kagent Kubernetes AI agent:
 - Requires GEMINI_API_KEY environment variable
 - Installs CRDs and controller
 - Deploys UI component
+- Automatically configures Grafana MCP integration (creates service account and API token)
 
 ### kgateway
 
 Deploys kgateway (AgentGateway):
 - Installs CRDs
 - Deploys controller with agentgateway enabled
+- Configures admin UI to bind to all interfaces (accessible via /ui endpoint)
+- Creates GatewayParameters for custom configuration
 
 ### ingress
 

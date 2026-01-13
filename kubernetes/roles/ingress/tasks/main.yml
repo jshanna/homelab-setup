@@ -129,6 +129,47 @@
   register: kagent_route
   changed_when: "'created' in kagent_route.stdout or 'configured' in kagent_route.stdout"
 
+- name: Create HTTPRoute for AgentGateway
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: agentgateway
+        namespace: {{ kgateway_namespace }}
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ agentgateway_hostname }}"
+        rules:
+          # Route admin UI and API endpoints to admin service
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /ui
+              - path:
+                  type: PathPrefix
+                  value: /config
+              - path:
+                  type: PathPrefix
+                  value: /config_dump
+            backendRefs:
+              - name: agentgateway-admin
+                port: 15000
+          # Route everything else to proxy
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: agentgateway
+                port: 8080
+  register: agentgateway_route
+  changed_when: "'created' in agentgateway_route.stdout or 'configured' in agentgateway_route.stdout"
+
 - name: Get Gateway external IP
   command: >
     kubectl get gateway {{ gateway_name }} -n {{ istio_namespace }}
@@ -143,16 +184,18 @@
       - "Gateway IP: {{ gateway_ip.stdout }}"
       - "=========================================="
       - "Configure these DNS entries in your local DNS:"
-      - "  {{ grafana_hostname }}     -> {{ gateway_ip.stdout }}"
-      - "  {{ prometheus_hostname }}  -> {{ gateway_ip.stdout }}"
-      - "  {{ alertmanager_hostname }} -> {{ gateway_ip.stdout }}"
-      - "  {{ kiali_hostname }}       -> {{ gateway_ip.stdout }}"
-      - "  {{ kagent_hostname }}      -> {{ gateway_ip.stdout }}"
+      - "  {{ grafana_hostname }}       -> {{ gateway_ip.stdout }}"
+      - "  {{ prometheus_hostname }}    -> {{ gateway_ip.stdout }}"
+      - "  {{ alertmanager_hostname }}  -> {{ gateway_ip.stdout }}"
+      - "  {{ kiali_hostname }}         -> {{ gateway_ip.stdout }}"
+      - "  {{ kagent_hostname }}        -> {{ gateway_ip.stdout }}"
+      - "  {{ agentgateway_hostname }}  -> {{ gateway_ip.stdout }}"
       - "=========================================="
       - "Access URLs:"
-      - "  Grafana:      http://{{ grafana_hostname }}"
-      - "  Prometheus:   http://{{ prometheus_hostname }}"
-      - "  Alertmanager: http://{{ alertmanager_hostname }}"
-      - "  Kiali:        http://{{ kiali_hostname }}"
-      - "  Kagent:       http://{{ kagent_hostname }}"
+      - "  Grafana:       http://{{ grafana_hostname }}"
+      - "  Prometheus:    http://{{ prometheus_hostname }}"
+      - "  Alertmanager:  http://{{ alertmanager_hostname }}"
+      - "  Kiali:         http://{{ kiali_hostname }}"
+      - "  Kagent:        http://{{ kagent_hostname }}"
+      - "  AgentGateway:  http://{{ agentgateway_hostname }}/ui"
       - "=========================================="

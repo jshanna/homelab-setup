@@ -45,6 +45,7 @@
         - { name: alertmanager, namespace: monitoring }
         - { name: kiali, namespace: istio-system }
         - { name: kagent, namespace: kagent }
+        - { name: agentgateway, namespace: kgateway-system }
       failed_when: false
 
     # ===========================================
@@ -66,6 +67,22 @@
     # ===========================================
     # Phase 3: Remove kgateway
     # ===========================================
+
+    - name: Delete agentgateway admin Service
+      command: kubectl delete service agentgateway-admin -n {{ kgateway_namespace }}
+      failed_when: false
+
+    - name: Delete agentgateway custom ConfigMap
+      command: kubectl delete configmap agentgateway-custom-config -n {{ kgateway_namespace }}
+      failed_when: false
+
+    - name: Delete agentgateway GatewayParameters
+      command: kubectl delete gatewayparameters agentgateway-params -n {{ kgateway_namespace }}
+      failed_when: false
+
+    - name: Delete agentgateway Gateway
+      command: kubectl delete gateway agentgateway -n {{ kgateway_namespace }}
+      failed_when: false
 
     - name: Uninstall kgateway Helm release
       command: helm uninstall kgateway -n {{ kgateway_namespace }}
@@ -102,6 +119,13 @@
     # ===========================================
     # Phase 5: Remove kube-prometheus-stack
     # ===========================================
+
+    - name: Remove Istio ServiceMonitor and PodMonitor
+      command: kubectl delete {{ item.kind }} {{ item.name }} -n {{ istio_namespace }}
+      loop:
+        - { kind: servicemonitor, name: istiod }
+        - { kind: podmonitor, name: ztunnel }
+      failed_when: false
 
     - name: Uninstall kube-prometheus-stack Helm release
       command: helm uninstall kube-prometheus-stack -n {{ prometheus_namespace }}
@@ -155,7 +179,7 @@
       failed_when: false
 
     - name: Remove Gateway API CRDs
-      command: kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+      command: kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
       failed_when: false
 
     # ===========================================

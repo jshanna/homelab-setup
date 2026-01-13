@@ -15,19 +15,12 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
-- name: Check if MetalLB is installed
-  command: helm status metallb -n {{ metallb_namespace }}
-  register: metallb_status
-  failed_when: false
-  changed_when: false
-
-- name: Install MetalLB with Helm
+- name: Install/upgrade MetalLB with Helm
   command: >
-    helm install metallb metallb/metallb
+    helm upgrade -i metallb metallb/metallb
     --namespace {{ metallb_namespace }}
     --version {{ metallb_version }}
     --wait
-  when: metallb_status.rc != 0
 
 - name: Wait for MetalLB controller to be ready
   command: >

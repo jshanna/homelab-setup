@@ -6,3 +6,9 @@ kagent_provider: gemini
 
 # API key - should be set via environment variable or vault
 # gemini_api_key: ""
+
+# Grafana MCP configuration
+monitoring_namespace: monitoring
+grafana_service: kube-prometheus-stack-grafana
+grafana_url: "http://kube-prometheus-stack-grafana.monitoring:80"
+prometheus_url: "http://kube-prometheus-stack-prometheus.monitoring:9090"

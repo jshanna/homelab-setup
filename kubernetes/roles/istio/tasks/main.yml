@@ -20,9 +20,9 @@
   when: istioctl_check.rc != 0
 
 - name: Install Gateway API CRDs
-  command: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
+  command: kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/standard-install.yaml
   register: gateway_api_result
-  changed_when: "'created' in gateway_api_result.stdout or 'configured' in gateway_api_result.stdout"
+  changed_when: "'created' in gateway_api_result.stdout or 'serverside-applied' in gateway_api_result.stdout"
 
 - name: Check if Istio is installed
   command: kubectl get namespace {{ istio_namespace }}
@@ -85,3 +85,26 @@
 - name: Display gateway IP
   debug:
     msg: "Istio Gateway IP: {{ gateway_ip.stdout }}"
+
+# ===========================================
+# Enable ambient mode for all namespaces
+# ===========================================
+
+- name: Get all namespaces
+  command: kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'
+  register: all_namespaces
+  changed_when: false
+
+- name: Remove ambient mode label from excluded namespaces
+  command: kubectl label namespace {{ item }} istio.io/dataplane-mode-
+  loop: "{{ ambient_excluded_namespaces }}"
+  when: item in all_namespaces.stdout.split()
+  failed_when: false
+  changed_when: false
+
+- name: Label all namespaces for Istio ambient mode
+  command: kubectl label namespace {{ item }} istio.io/dataplane-mode=ambient --overwrite
+  loop: "{{ all_namespaces.stdout.split() }}"
+  when: item not in ambient_excluded_namespaces
+  changed_when: false
+

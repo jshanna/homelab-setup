@@ -5,30 +5,13 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
-- name: Label kgateway namespace for Istio ambient
-  command: kubectl label namespace {{ kgateway_namespace }} istio.io/dataplane-mode=ambient --overwrite
-  changed_when: false
-
-- name: Check if kgateway CRDs are installed
-  command: helm status kgateway-crds -n {{ kgateway_namespace }}
-  register: kgateway_crds_status
-  failed_when: false
-  changed_when: false
-
-- name: Install kgateway CRDs
+- name: Install/upgrade kgateway CRDs
   command: >
     helm upgrade -i kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
     --namespace {{ kgateway_namespace }}
     --version {{ kgateway_version }}
-  when: kgateway_crds_status.rc != 0
 
-- name: Check if kgateway is installed
-  command: helm status kgateway -n {{ kgateway_namespace }}
-  register: kgateway_status
-  failed_when: false
-  changed_when: false
-
-- name: Install kgateway with agentgateway enabled
+- name: Install/upgrade kgateway with agentgateway enabled
   command: >
     helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
     --namespace {{ kgateway_namespace }}
@@ -36,7 +19,6 @@
     --set agentgateway.enabled={{ agentgateway_enabled }}
     --set controller.image.pullPolicy=Always
     --wait --timeout 5m
-  when: kgateway_status.rc != 0
 
 - name: Wait for kgateway controller to be ready
   command: >
@@ -49,3 +31,131 @@
   retries: 2
   delay: 30
   until: kgateway_wait.rc == 0
+
+# Configure agentgateway admin binding BEFORE creating the Gateway
+# This ensures the pod starts with correct config on first run
+
+- name: Create custom ConfigMap for agentgateway admin binding
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: agentgateway-custom-config
+        namespace: {{ kgateway_namespace }}
+      data:
+        config.yaml: |
+          config:
+            adminAddr: "{{ agentgateway_admin_address }}:{{ agentgateway_admin_port }}"
+  register: agentgateway_custom_config
+  changed_when: "'created' in agentgateway_custom_config.stdout or 'configured' in agentgateway_custom_config.stdout"
+
+- name: Create GatewayParameters for agentgateway
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.kgateway.dev/v1alpha1
+      kind: GatewayParameters
+      metadata:
+        name: agentgateway-params
+        namespace: {{ kgateway_namespace }}
+      spec:
+        kube:
+          agentgateway:
+            enabled: true
+            customConfigMapName: agentgateway-custom-config
+  register: agentgateway_params
+  changed_when: "'created' in agentgateway_params.stdout or 'configured' in agentgateway_params.stdout"
+
+- name: Update agentgateway GatewayClass with parameters reference
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: GatewayClass
+      metadata:
+        name: agentgateway
+      spec:
+        controllerName: kgateway.dev/agentgateway
+        description: Specialized class for agentgateway.
+        parametersRef:
+          group: gateway.kgateway.dev
+          kind: GatewayParameters
+          name: agentgateway-params
+          namespace: {{ kgateway_namespace }}
+  register: agentgateway_gc
+  changed_when: "'created' in agentgateway_gc.stdout or 'configured' in agentgateway_gc.stdout"
+
+- name: Create agentgateway Gateway
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: agentgateway
+        namespace: {{ kgateway_namespace }}
+      spec:
+        gatewayClassName: agentgateway
+        listeners:
+          - name: http
+            port: {{ agentgateway_port }}
+            protocol: HTTP
+            allowedRoutes:
+              namespaces:
+                from: Same
+  register: agentgateway_gw
+  changed_when: "'created' in agentgateway_gw.stdout or 'configured' in agentgateway_gw.stdout"
+
+- name: Wait for agentgateway deployment to be ready
+  command: >
+    kubectl wait --namespace {{ kgateway_namespace }}
+    --for=condition=ready pod
+    --selector=gateway.networking.k8s.io/gateway-name=agentgateway
+    --timeout=300s
+  changed_when: false
+  retries: 3
+  delay: 30
+
+# For existing deployments, restart the pod if config changed
+- name: Restart agentgateway pod to pick up config change
+  command: >
+    kubectl delete pod -n {{ kgateway_namespace }}
+    -l gateway.networking.k8s.io/gateway-name=agentgateway
+  when:
+    - not agentgateway_gw.changed
+    - agentgateway_custom_config.changed or agentgateway_params.changed or agentgateway_gc.changed
+
+- name: Wait for agentgateway to be ready after restart
+  command: >
+    kubectl wait --namespace {{ kgateway_namespace }}
+    --for=condition=ready pod
+    --selector=gateway.networking.k8s.io/gateway-name=agentgateway
+    --timeout=120s
+  when:
+    - not agentgateway_gw.changed
+    - agentgateway_custom_config.changed or agentgateway_params.changed or agentgateway_gc.changed
+  changed_when: false
+  retries: 2
+  delay: 10
+
+- name: Create agentgateway admin Service
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: agentgateway-admin
+        namespace: {{ kgateway_namespace }}
+      spec:
+        selector:
+          gateway.networking.k8s.io/gateway-name: agentgateway
+        ports:
+          - name: admin
+            port: 15000
+            targetPort: 15000
+            protocol: TCP
+  register: admin_svc
+  changed_when: "'created' in admin_svc.stdout or 'configured' in admin_svc.stdout"

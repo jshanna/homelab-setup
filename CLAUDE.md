@@ -77,12 +77,12 @@ The setup uses two sequential playbooks:
 | Kubernetes | 1.31 | Via kubeadm |
 | containerd | via docker.io | Ubuntu package, not Docker repo |
 | Calico | 3.28.0 | Tigera operator method |
-| Istio | 1.27.1 | Supports K8s 1.30-1.34 |
+| Istio | 1.27.1 | Supports K8s 1.29-1.33 |
 | Gateway API | v1.4.0 | Required by Istio 1.27+ and kgateway |
 | MetalLB | 0.14.9 | L2 mode |
-| kube-prometheus-stack | 72.6.2 | Helm chart |
-| Kiali | 2.7.0 | Operator install |
-| kgateway | v2.1.1 | Requires Gateway API v1.4.0 |
+| kube-prometheus-stack | 72.6.4 | Helm chart |
+| Kiali | 2.20.0 | Operator install, requires 2.12+ for Istio 1.27 |
+| kgateway | v2.1.2 | Requires Gateway API v1.4.0 |
 
 ## Important Implementation Details
 
@@ -99,10 +99,11 @@ The setup uses two sequential playbooks:
 
 ## Maintenance
 
-When making changes to this repository, keep documentation in sync:
+When making changes to this repository:
 - Update README.md if adding new roles, changing architecture, or modifying configuration options
 - Update this file (CLAUDE.md) if commands or architecture patterns change
 - Verify version compatibility when updating any component (check upstream docs)
+- **Commit and push changes** after completing modifications - don't leave uncommitted work
 
 ## Reference Guide
 

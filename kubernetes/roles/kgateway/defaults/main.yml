@@ -1,5 +1,10 @@
 ---
 kgateway_namespace: kgateway-system
-kgateway_version: "v2.1.1"
+# Latest stable release (requires Gateway API v1.4.0)
+kgateway_version: "v2.1.2"
 
 agentgateway_enabled: true
+agentgateway_port: 8080
+# Bind admin UI to all interfaces so it can be accessed via Service
+agentgateway_admin_address: "0.0.0.0"
+agentgateway_admin_port: 15000
