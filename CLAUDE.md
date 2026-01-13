@@ -18,7 +18,10 @@ cd kubernetes && ansible-playbook services.yml --ask-pass --ask-become-pass
 
 # If using SSH keys and passwordless sudo, omit --ask-pass --ask-become-pass
 
-# Reset/decommission the cluster (removes Kubernetes completely)
+# Reset services only (keep base cluster intact)
+cd kubernetes && ansible-playbook reset-services.yml --ask-pass --ask-become-pass
+
+# Reset/decommission the entire cluster (removes Kubernetes and containerd completely)
 cd kubernetes && ansible-playbook reset.yml --ask-pass --ask-become-pass
 
 # Check Ansible syntax
@@ -40,14 +43,18 @@ The setup uses two sequential playbooks:
 
 1. **site.yml** - Cluster provisioning
    - `preflight` role validates node requirements (memory, CPU, disk, kernel, connectivity)
-   - `common` role prepares all nodes (containerd, kubeadm, kernel params)
+   - `common` role prepares all nodes (docker.io/containerd, kubeadm, kernel params)
    - `kubernetes` role initializes control plane then joins workers
    - Join token is passed via `/tmp/kubeadm_join_command` local file
+   - Calico CNI installed via **Tigera operator** (not simple manifest)
 
 2. **services.yml** - Platform services (runs on control plane only)
    - Deploys in order: Helm → MetalLB → Istio → Prometheus → Kiali → Kagent → kgateway → Ingress routes
    - All services integrate through Istio Gateway API for ingress
    - MetalLB provides LoadBalancer IPs from configured pool
+
+3. **reset-services.yml** - Removes services only, keeps cluster
+4. **reset.yml** - Full cluster teardown (removes K8s, containerd, kernel configs, repos)
 
 ## Key Configuration
 
@@ -57,14 +64,46 @@ The setup uses two sequential playbooks:
 
 ## Networking
 
-- Pod CIDR: 10.244.0.0/16
+- Pod CIDR: **10.10.0.0/16**
 - Service CIDR: 10.96.0.0/12
 - MetalLB pool: 192.168.1.24-29
-- CNI: Calico
+- CNI: Calico via Tigera operator
 - Service mesh: Istio ambient mode (sidecar-less)
+
+## Component Versions (verified compatible)
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Kubernetes | 1.31 | Via kubeadm |
+| containerd | via docker.io | Ubuntu package, not Docker repo |
+| Calico | 3.28.0 | Tigera operator method |
+| Istio | 1.27.1 | Supports K8s 1.30-1.34 |
+| Gateway API | v1.4.0 | Required by Istio 1.27+ and kgateway |
+| MetalLB | 0.14.9 | L2 mode |
+| kube-prometheus-stack | 72.6.2 | Helm chart |
+| Kiali | 2.7.0 | Operator install |
+| kgateway | v2.1.1 | Requires Gateway API v1.4.0 |
+
+## Important Implementation Details
+
+- **Container runtime**: Uses `docker.io` package from Ubuntu repos (includes containerd), NOT `containerd.io` from Docker's repo. This avoids version conflicts.
+- **Calico installation**: Uses Tigera operator + custom-resources.yaml, NOT the simple calico.yaml manifest. Pods run in `calico-system` namespace.
+- **GPG keys**: Uses modern `/etc/apt/keyrings/` directory with `gpg --dearmor`, not deprecated `apt_key`.
+- **Grafana password**: Must change from "changeme" in group_vars/all.yml before running services.yml.
+
+## Troubleshooting Reference
+
+- If containerd.io conflicts with docker.io: Run reset.yml to remove containerd.io and Docker repo
+- If Calico pods crash: Check `/etc/cni/net.d/calico-kubeconfig` for malformed URLs
+- If etcd won't start: Usually corrupted data from previous attempts - run reset.yml
 
 ## Maintenance
 
 When making changes to this repository, keep documentation in sync:
 - Update README.md if adding new roles, changing architecture, or modifying configuration options
 - Update this file (CLAUDE.md) if commands or architecture patterns change
+- Verify version compatibility when updating any component (check upstream docs)
+
+## Reference Guide
+
+Playbook aligned with: https://www.cherryservers.com/blog/install-kubernetes-ubuntu
