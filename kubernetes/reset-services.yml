@@ -84,6 +84,10 @@
       command: kubectl delete gateway agentgateway -n {{ kgateway_namespace }}
       failed_when: false
 
+    - name: Delete agentgateway GatewayClass
+      command: kubectl delete gatewayclass agentgateway
+      failed_when: false
+
     - name: Uninstall kgateway Helm release
       command: helm uninstall kgateway -n {{ kgateway_namespace }}
       failed_when: false
@@ -158,6 +162,17 @@
     # ===========================================
     # Phase 6: Remove Istio
     # ===========================================
+
+    - name: Get all namespaces
+      command: kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'
+      register: all_namespaces
+      changed_when: false
+
+    - name: Remove ambient mode labels from all namespaces
+      command: kubectl label namespace {{ item }} istio.io/dataplane-mode-
+      loop: "{{ all_namespaces.stdout.split() }}"
+      failed_when: false
+      changed_when: false
 
     - name: Delete Istio Gateway
       command: kubectl delete gateway {{ gateway_name }} -n {{ istio_namespace }}
@@ -264,10 +279,10 @@
           - "Removed:"
           - "  - Ingress routes (HTTPRoutes)"
           - "  - Kagent"
-          - "  - kgateway"
+          - "  - kgateway (including GatewayClass)"
           - "  - Kiali"
           - "  - kube-prometheus-stack"
-          - "  - Istio"
+          - "  - Istio (including ambient mode labels)"
           - "  - MetalLB"
           - "  - Gateway API CRDs"
           - "  - Helm repositories"

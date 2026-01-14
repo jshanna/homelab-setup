@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Ansible playbooks for provisioning a 3-node Kubernetes homelab cluster (1 control plane, 2 workers) with a full observability and AI agent stack.
+Ansible playbooks for provisioning a 3-node Kubernetes homelab cluster (1 control plane, 2 workers) on **Ubuntu Server 24.04 LTS**, with a full observability and AI agent stack.
 
 ## Commands
 
@@ -86,7 +86,8 @@ The setup uses two sequential playbooks:
 
 ## Important Implementation Details
 
-- **Container runtime**: Uses `docker.io` package from Ubuntu repos (includes containerd), NOT `containerd.io` from Docker's repo. This avoids version conflicts.
+- **Target OS**: Ubuntu Server 24.04 LTS (Noble Numbat). Playbooks use Ubuntu-specific package names and paths.
+- **Container runtime**: Uses `docker.io` package from Ubuntu 24.04 repos (includes containerd), NOT `containerd.io` from Docker's repo. This avoids version conflicts.
 - **Calico installation**: Uses Tigera operator + custom-resources.yaml, NOT the simple calico.yaml manifest. Pods run in `calico-system` namespace.
 - **GPG keys**: Uses modern `/etc/apt/keyrings/` directory with `gpg --dearmor`, not deprecated `apt_key`.
 - **Grafana password**: Must change from "changeme" in group_vars/all.yml before running services.yml.

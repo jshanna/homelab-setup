@@ -1,6 +1,6 @@
 # Homelab Kubernetes Setup
 
-Ansible playbooks for provisioning a production-like Kubernetes cluster on homelab infrastructure. This setup deploys a 3-node cluster with a full observability stack, service mesh, and AI agent infrastructure.
+Ansible playbooks for provisioning a production-like Kubernetes cluster on homelab infrastructure running Ubuntu Server 24.04 LTS. This setup deploys a 3-node cluster with a full observability stack, service mesh, and AI agent infrastructure.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 
 ## Prerequisites
 
-- 3 Ubuntu/Debian servers with a sudo-enabled user
+- 3 Ubuntu Server 24.04 LTS nodes with a sudo-enabled user
 - Ansible installed on your control machine
 - Network connectivity between all nodes
 - (Optional) GEMINI_API_KEY for Kagent
