@@ -28,16 +28,9 @@
         adminPassword: "{{ grafana_admin_password }}"
         service:
           type: ClusterIP
-        # Set password via env var to avoid "change password" prompt
-        env:
-          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
         grafana.ini:
-          security:
-            disable_initial_admin_creation: false
           users:
             allow_sign_up: false
-          auth:
-            disable_login_form: false
       prometheus:
         prometheusSpec:
           retention: {{ prometheus_retention }}
