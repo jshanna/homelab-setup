@@ -32,7 +32,7 @@ istio_profile: "ambient"
 # ===========================================
 # Monitoring (Prometheus/Grafana)
 # ===========================================
-grafana_admin_password: "admin"  # Change this!
+grafana_admin_password: "prom-operator"  # Change this! Do NOT use "admin" (triggers forced password change)
 prometheus_retention: "15d"
 prometheus_storage_size: "50Gi"
 

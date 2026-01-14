@@ -254,7 +254,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `metallb_ip_range` | 192.168.1.24-192.168.1.29 | MetalLB IP pool |
 | `istio_version` | 1.27.1 | Istio version |
 | `istio_profile` | ambient | Istio installation profile |
-| `grafana_admin_password` | changeme | Grafana admin password |
+| `grafana_admin_password` | prom-operator | Grafana admin password (do NOT use "admin") |
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
 | `kiali_version` | 2.20.0 | Kiali version (2.12+ required for Istio 1.27) |
