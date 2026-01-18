@@ -1,6 +1,7 @@
 ---
 mongodb_namespace: databases
-mongodb_chart_version: "16.4.0"
+# Note: Don't pin old chart versions - Bitnami removes old image tags from Docker Hub
+mongodb_chart_version: ""
 mongodb_architecture: "standalone"
 mongodb_storage_size: "20Gi"
 mongodb_metrics_enabled: true

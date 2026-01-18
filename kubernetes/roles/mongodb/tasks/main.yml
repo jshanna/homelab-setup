@@ -47,7 +47,7 @@
   command: >
     helm upgrade -i mongodb bitnami/mongodb
     --namespace {{ mongodb_namespace }}
-    --version {{ mongodb_chart_version }}
+    {{ '--version ' + mongodb_chart_version if mongodb_chart_version else '' }}
     --values /tmp/mongodb-values.yaml
     --wait --timeout 10m
 
