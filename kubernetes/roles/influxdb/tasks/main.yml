@@ -53,7 +53,7 @@
     --namespace {{ influxdb_namespace }}
     --version {{ influxdb_chart_version }}
     --values /tmp/influxdb-values.yaml
-    --wait --timeout 5m
+    --wait --timeout 10m
 
 - name: Wait for InfluxDB to be ready
   command: >

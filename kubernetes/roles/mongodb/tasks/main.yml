@@ -49,7 +49,7 @@
     --namespace {{ mongodb_namespace }}
     --version {{ mongodb_chart_version }}
     --values /tmp/mongodb-values.yaml
-    --wait --timeout 5m
+    --wait --timeout 10m
 
 - name: Wait for MongoDB to be ready
   command: >
