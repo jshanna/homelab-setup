@@ -84,7 +84,7 @@ The setup uses two sequential playbooks:
 | kube-prometheus-stack | 72.6.4 | Helm chart |
 | Kiali | 2.20.0 | Operator install, requires 2.12+ for Istio 1.27 |
 | kgateway | v2.1.2 | Requires Gateway API v1.4.0 |
-| InfluxDB | 2.1.2 | Helm chart, time-series database |
+| InfluxDB | 3 Core (latest) | Bitnami chart, time-series database |
 | MongoDB | latest | Bitnami Helm chart (don't pin - old images removed) |
 | Mongo Express | 1.0.2 | Web UI for MongoDB |
 
@@ -95,7 +95,7 @@ The setup uses two sequential playbooks:
 - **Calico installation**: Uses Tigera operator + custom-resources.yaml, NOT the simple calico.yaml manifest. Pods run in `calico-system` namespace.
 - **GPG keys**: Uses modern `/etc/apt/keyrings/` directory with `gpg --dearmor`, not deprecated `apt_key`.
 - **Grafana password**: Must change from "changeme" in group_vars/all.yml before running services.yml.
-- **Database passwords**: Both `influxdb_admin_password` and `mongodb_root_password` must be changed from "changeme" in group_vars/all.yml before running services.yml.
+- **Database credentials**: `influxdb_admin_token` (bearer token) and `mongodb_root_password` must be changed from "changeme" in group_vars/all.yml before running services.yml.
 
 ## Troubleshooting Reference
 

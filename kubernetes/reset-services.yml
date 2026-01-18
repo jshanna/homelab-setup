@@ -61,12 +61,11 @@
         - { kind: service }
       failed_when: false
 
-    - name: Delete InfluxDB ServiceMonitor
-      command: kubectl delete servicemonitor influxdb2 -n databases
-      failed_when: false
-
-    - name: Uninstall influxdb2 Helm release
-      command: helm uninstall influxdb2 -n databases
+    - name: Uninstall InfluxDB Helm releases (v2 and v3)
+      command: helm uninstall {{ item }} -n databases
+      loop:
+        - influxdb2
+        - influxdb
       failed_when: false
 
     - name: Uninstall mongodb Helm release
@@ -83,6 +82,7 @@
         state: absent
       loop:
         - /tmp/influxdb-values.yaml
+        - /tmp/influxdb3-values.yaml
         - /tmp/mongodb-values.yaml
 
     # ===========================================

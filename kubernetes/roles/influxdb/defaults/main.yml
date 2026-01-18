@@ -1,8 +1,7 @@
 ---
 influxdb_namespace: databases
-influxdb_chart_version: "2.1.2"
+# Note: Don't pin old chart versions - Bitnami removes old image tags from Docker Hub
+influxdb_chart_version: ""
 influxdb_storage_size: "50Gi"
-influxdb_org: "homelab"
-influxdb_bucket: "default"
-influxdb_retention: "30d"
 influxdb_hostname: influxdb.homelab.local
+influxdb_metrics_enabled: true

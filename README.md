@@ -34,7 +34,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Istio | 1.27.1 | Service mesh (ambient mode) |
 | Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
 | Grafana | (via kube-prometheus-stack) | Metrics visualization |
-| InfluxDB | 2.1.2 | Time-series database |
+| InfluxDB | 3 Core | Time-series database (Bitnami chart) |
 | MongoDB | latest | Document database (Bitnami chart) |
 | Mongo Express | 1.0.2 | MongoDB web UI |
 | Kiali | 2.20.0 | Istio service mesh observability |
@@ -269,9 +269,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `grafana_admin_password` | prom-operator | Grafana admin password (do NOT use "admin") |
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
-| `influxdb_admin_password` | changeme | InfluxDB admin password (MUST change!) |
-| `influxdb_org` | homelab | InfluxDB organization name |
-| `influxdb_bucket` | default | InfluxDB default bucket |
+| `influxdb_admin_token` | changeme | InfluxDB bearer token (MUST change!) |
 | `influxdb_storage_size` | 50Gi | InfluxDB storage size |
 | `mongodb_root_password` | changeme | MongoDB root password (MUST change!) |
 | `mongodb_architecture` | standalone | MongoDB architecture (standalone/replicaset) |
@@ -332,11 +330,12 @@ Deploys kube-prometheus-stack:
 
 ### influxdb
 
-Deploys InfluxDB 2.x time-series database:
-- Installs via InfluxData Helm chart
-- Configures organization, bucket, and retention policy
-- Creates ServiceMonitor for Prometheus metrics
+Deploys InfluxDB 3 Core time-series database:
+- Installs via Bitnami Helm chart
+- Uses bearer token authentication
+- Automatic ServiceMonitor for Prometheus metrics
 - Persistent storage with configurable size
+- Handles migration from InfluxDB 2.x automatically
 
 ### mongodb
 

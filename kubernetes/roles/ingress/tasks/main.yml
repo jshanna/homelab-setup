@@ -191,8 +191,8 @@
                   type: PathPrefix
                   value: /
             backendRefs:
-              - name: influxdb2-influxdb2
-                port: 80
+              - name: influxdb
+                port: 8181
   register: influxdb_route
   changed_when: "'created' in influxdb_route.stdout or 'configured' in influxdb_route.stdout"
 
