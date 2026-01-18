@@ -85,7 +85,7 @@ The setup uses two sequential playbooks:
 | Kiali | 2.20.0 | Operator install, requires 2.12+ for Istio 1.27 |
 | kgateway | v2.1.2 | Requires Gateway API v1.4.0 |
 | InfluxDB | 2.1.2 | Helm chart, time-series database |
-| MongoDB | 16.4.0 | Bitnami Helm chart, standalone mode |
+| MongoDB | latest | Bitnami Helm chart (don't pin - old images removed) |
 | Mongo Express | 1.0.2 | Web UI for MongoDB |
 
 ## Important Implementation Details

@@ -35,7 +35,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
 | Grafana | (via kube-prometheus-stack) | Metrics visualization |
 | InfluxDB | 2.1.2 | Time-series database |
-| MongoDB | 16.4.0 | Document database (Bitnami chart) |
+| MongoDB | latest | Document database (Bitnami chart) |
 | Mongo Express | 1.0.2 | MongoDB web UI |
 | Kiali | 2.20.0 | Istio service mesh observability |
 | Kagent | latest | Kubernetes AI agent |
