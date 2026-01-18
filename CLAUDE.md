@@ -84,7 +84,7 @@ The setup uses two sequential playbooks:
 | kube-prometheus-stack | 72.6.4 | Helm chart |
 | Kiali | 2.20.0 | Operator install, requires 2.12+ for Istio 1.27 |
 | kgateway | v2.1.2 | Requires Gateway API v1.4.0 |
-| InfluxDB | 3 Core (latest) | Bitnami chart, time-series database |
+| InfluxDB | 3 Core | Official image, direct deployment (not Helm) |
 | MongoDB | latest | Bitnami Helm chart (don't pin - old images removed) |
 | Mongo Express | 1.0.2 | Web UI for MongoDB |
 

@@ -61,11 +61,21 @@
         - { kind: service }
       failed_when: false
 
-    - name: Uninstall InfluxDB Helm releases (v2 and v3)
+    - name: Uninstall InfluxDB Helm releases (v2 and Bitnami v3)
       command: helm uninstall {{ item }} -n databases
       loop:
         - influxdb2
         - influxdb
+      failed_when: false
+
+    - name: Delete InfluxDB direct deployment resources
+      command: kubectl delete {{ item.kind }} {{ item.name }} -n databases
+      loop:
+        - { kind: deployment, name: influxdb }
+        - { kind: service, name: influxdb }
+        - { kind: servicemonitor, name: influxdb }
+        - { kind: secret, name: influxdb-auth }
+        - { kind: pvc, name: influxdb-data }
       failed_when: false
 
     - name: Uninstall mongodb Helm release

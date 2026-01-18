@@ -34,7 +34,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Istio | 1.27.1 | Service mesh (ambient mode) |
 | Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
 | Grafana | (via kube-prometheus-stack) | Metrics visualization |
-| InfluxDB | 3 Core | Time-series database (Bitnami chart) |
+| InfluxDB | 3 Core | Time-series database (official image) |
 | MongoDB | latest | Document database (Bitnami chart) |
 | Mongo Express | 1.0.2 | MongoDB web UI |
 | Kiali | 2.20.0 | Istio service mesh observability |
@@ -331,11 +331,12 @@ Deploys kube-prometheus-stack:
 ### influxdb
 
 Deploys InfluxDB 3 Core time-series database:
-- Installs via Bitnami Helm chart
+- Uses official `influxdb:3-core` Docker image (not Helm)
+- Direct Kubernetes deployment for reliability
 - Uses bearer token authentication
-- Automatic ServiceMonitor for Prometheus metrics
+- ServiceMonitor for Prometheus metrics
 - Persistent storage with configurable size
-- Handles migration from InfluxDB 2.x automatically
+- Handles migration from older deployments automatically
 
 ### mongodb
 

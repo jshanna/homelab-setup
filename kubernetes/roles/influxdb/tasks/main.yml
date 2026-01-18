@@ -5,36 +5,53 @@
   when: influxdb_admin_token is not defined or influxdb_admin_token == "" or influxdb_admin_token == "changeme" or influxdb_admin_token == "admin"
 
 # ===========================================
-# Migration: Remove InfluxDB 2.x if present
+# Migration: Remove old InfluxDB deployments
 # ===========================================
 
-- name: Check if InfluxDB 2.x release exists
+- name: Check if InfluxDB 2.x Helm release exists
   command: helm status influxdb2 -n {{ influxdb_namespace }}
   register: influxdb2_status
   failed_when: false
   changed_when: false
 
-- name: Remove old InfluxDB 2.x ServiceMonitor
-  command: kubectl delete servicemonitor influxdb2 -n {{ influxdb_namespace }}
-  when: influxdb2_status.rc == 0
-  failed_when: false
-
-- name: Uninstall InfluxDB 2.x release
+- name: Uninstall InfluxDB 2.x Helm release
   command: helm uninstall influxdb2 -n {{ influxdb_namespace }}
   when: influxdb2_status.rc == 0
 
-- name: Delete old InfluxDB 2.x PVC
-  command: kubectl delete pvc influxdb2 -n {{ influxdb_namespace }}
-  when: influxdb2_status.rc == 0
+- name: Check if Bitnami InfluxDB Helm release exists
+  command: helm status influxdb -n {{ influxdb_namespace }}
+  register: influxdb_helm_status
+  failed_when: false
+  changed_when: false
+
+- name: Uninstall Bitnami InfluxDB Helm release
+  command: helm uninstall influxdb -n {{ influxdb_namespace }}
+  when: influxdb_helm_status.rc == 0
+
+- name: Delete old InfluxDB PVCs
+  command: kubectl delete pvc {{ item }} -n {{ influxdb_namespace }}
+  loop:
+    - influxdb2
+    - influxdb
   failed_when: false
 
-- name: Remove old InfluxDB 2.x values file
+- name: Delete old ServiceMonitors
+  command: kubectl delete servicemonitor {{ item }} -n {{ influxdb_namespace }}
+  loop:
+    - influxdb2
+    - influxdb
+  failed_when: false
+
+- name: Remove old values files
   file:
-    path: /tmp/influxdb-values.yaml
+    path: "{{ item }}"
     state: absent
+  loop:
+    - /tmp/influxdb-values.yaml
+    - /tmp/influxdb3-values.yaml
 
 # ===========================================
-# Install InfluxDB 3 Core via Bitnami
+# Deploy InfluxDB 3 Core (official image)
 # ===========================================
 
 - name: Create databases namespace
@@ -43,39 +60,110 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
-- name: Create InfluxDB 3 values file
-  copy:
-    dest: /tmp/influxdb3-values.yaml
-    content: |
-      auth:
-        enabled: true
-        admin:
-          token: "{{ influxdb_admin_token }}"
-      persistence:
-        enabled: true
-        size: {{ influxdb_storage_size }}
-      service:
+- name: Deploy InfluxDB 3 Core
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: influxdb-data
+        namespace: {{ influxdb_namespace }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ influxdb_storage_size }}
+      ---
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: influxdb-auth
+        namespace: {{ influxdb_namespace }}
+      type: Opaque
+      stringData:
+        admin-token: "{{ influxdb_admin_token }}"
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: influxdb
+        namespace: {{ influxdb_namespace }}
+        labels:
+          app.kubernetes.io/name: influxdb
+          app.kubernetes.io/component: database
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: influxdb
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: influxdb
+          spec:
+            containers:
+              - name: influxdb
+                image: influxdb:3-core
+                args:
+                  - influxdb3
+                  - serve
+                  - --node-id=node-0
+                  - --object-store=file
+                  - --data-dir=/var/lib/influxdb3/data
+                ports:
+                  - containerPort: 8181
+                    name: http
+                env:
+                  - name: INFLUXDB3_BEARER_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: influxdb-auth
+                        key: admin-token
+                resources:
+                  requests:
+                    memory: 256Mi
+                    cpu: 100m
+                  limits:
+                    memory: 1Gi
+                volumeMounts:
+                  - name: data
+                    mountPath: /var/lib/influxdb3/data
+                livenessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8181
+                  initialDelaySeconds: 30
+                  periodSeconds: 10
+                readinessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8181
+                  initialDelaySeconds: 5
+                  periodSeconds: 5
+            volumes:
+              - name: data
+                persistentVolumeClaim:
+                  claimName: influxdb-data
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: influxdb
+        namespace: {{ influxdb_namespace }}
+        labels:
+          app.kubernetes.io/name: influxdb
+      spec:
         type: ClusterIP
         ports:
-          http: 8181
-      resources:
-        requests:
-          memory: 256Mi
-          cpu: 100m
-        limits:
-          memory: 1Gi
-      metrics:
-        enabled: {{ influxdb_metrics_enabled | lower }}
-        serviceMonitor:
-          enabled: {{ influxdb_metrics_enabled | lower }}
-
-- name: Install/upgrade InfluxDB 3 Core
-  command: >
-    helm upgrade -i influxdb oci://registry-1.docker.io/bitnamicharts/influxdb
-    --namespace {{ influxdb_namespace }}
-    {{ '--version ' + influxdb_chart_version if influxdb_chart_version else '' }}
-    --values /tmp/influxdb3-values.yaml
-    --wait --timeout 10m
+          - port: 8181
+            targetPort: 8181
+            name: http
+        selector:
+          app.kubernetes.io/name: influxdb
+  register: influxdb_deploy
+  changed_when: "'created' in influxdb_deploy.stdout or 'configured' in influxdb_deploy.stdout"
 
 - name: Wait for InfluxDB to be ready
   command: >
@@ -85,11 +173,42 @@
     --timeout=300s
   changed_when: false
 
+# ===========================================
+# Prometheus monitoring (ServiceMonitor)
+# ===========================================
+
+- name: Create ServiceMonitor for InfluxDB
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: influxdb
+        namespace: {{ influxdb_namespace }}
+        labels:
+          app.kubernetes.io/name: influxdb
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: influxdb
+        namespaceSelector:
+          matchNames:
+            - {{ influxdb_namespace }}
+        endpoints:
+          - port: http
+            interval: 30s
+            path: /metrics
+  register: influxdb_monitor
+  changed_when: "'created' in influxdb_monitor.stdout or 'configured' in influxdb_monitor.stdout"
+  when: influxdb_metrics_enabled | default(true)
+
 - name: Display InfluxDB deployment info
   debug:
     msg:
       - "InfluxDB 3 Core deployed successfully"
       - "Namespace: {{ influxdb_namespace }}"
+      - "Image: influxdb:3-core (official)"
       - "API Port: 8181"
       - "Access via: http://{{ influxdb_hostname }} (after ingress setup)"
-      - "Note: Use bearer token authentication with your configured token"
+      - "Auth: Bearer token (configured in secret)"

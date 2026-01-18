@@ -62,7 +62,7 @@ agentgateway_hostname: "agentgateway.homelab.local"
 # Database Configuration (InfluxDB & MongoDB)
 # ===========================================
 # InfluxDB 3 Core uses bearer token authentication
-influxdb_admin_token: "changeme"  # MUST CHANGE before running!
+influxdb_admin_token: "influx_admin"  # MUST CHANGE before running!
 influxdb_storage_size: "50Gi"
 
 mongodb_root_password: "mongo_admin"  # MUST CHANGE before running!
