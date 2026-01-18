@@ -1,0 +1,139 @@
+---
+- name: Validate MongoDB root password is set
+  fail:
+    msg: "mongodb_root_password must be set in group_vars/all.yml. Do not use 'admin', 'changeme', or empty."
+  when: mongodb_root_password is not defined or mongodb_root_password == "" or mongodb_root_password == "changeme" or mongodb_root_password == "admin"
+
+- name: Add Bitnami Helm repository
+  command: helm repo add bitnami https://charts.bitnami.com/bitnami
+  register: helm_repo_result
+  changed_when: "'has been added' in helm_repo_result.stdout"
+  failed_when: false
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false
+
+- name: Create databases namespace
+  command: kubectl create namespace {{ mongodb_namespace }}
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
+
+- name: Create MongoDB values file
+  copy:
+    dest: /tmp/mongodb-values.yaml
+    content: |
+      architecture: {{ mongodb_architecture }}
+      auth:
+        enabled: true
+        rootUser: root
+        rootPassword: "{{ mongodb_root_password }}"
+      persistence:
+        enabled: true
+        size: {{ mongodb_storage_size }}
+      resources:
+        requests:
+          memory: 256Mi
+          cpu: 100m
+        limits:
+          memory: 1Gi
+      metrics:
+        enabled: {{ mongodb_metrics_enabled | lower }}
+        serviceMonitor:
+          enabled: {{ mongodb_metrics_enabled | lower }}
+
+- name: Install/upgrade MongoDB
+  command: >
+    helm upgrade -i mongodb bitnami/mongodb
+    --namespace {{ mongodb_namespace }}
+    --version {{ mongodb_chart_version }}
+    --values /tmp/mongodb-values.yaml
+    --wait --timeout 5m
+
+- name: Wait for MongoDB to be ready
+  command: >
+    kubectl wait --namespace {{ mongodb_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=mongodb
+    --timeout=300s
+  changed_when: false
+
+# ===========================================
+# Deploy Mongo Express (Web UI)
+# ===========================================
+
+- name: Deploy Mongo Express
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: mongo-express
+        namespace: {{ mongodb_namespace }}
+        labels:
+          app: mongo-express
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: mongo-express
+        template:
+          metadata:
+            labels:
+              app: mongo-express
+          spec:
+            containers:
+              - name: mongo-express
+                image: mongo-express:1.0.2
+                ports:
+                  - containerPort: 8081
+                env:
+                  - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+                    value: "root"
+                  - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+                    value: "{{ mongodb_root_password }}"
+                  - name: ME_CONFIG_MONGODB_SERVER
+                    value: "mongodb"
+                  - name: ME_CONFIG_BASICAUTH
+                    value: "false"
+                resources:
+                  requests:
+                    memory: 64Mi
+                    cpu: 50m
+                  limits:
+                    memory: 256Mi
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mongo-express
+        namespace: {{ mongodb_namespace }}
+        labels:
+          app: mongo-express
+      spec:
+        type: ClusterIP
+        ports:
+          - port: 8081
+            targetPort: 8081
+        selector:
+          app: mongo-express
+  register: mongo_express_result
+  changed_when: "'created' in mongo_express_result.stdout or 'configured' in mongo_express_result.stdout"
+
+- name: Wait for Mongo Express to be ready
+  command: >
+    kubectl wait --namespace {{ mongodb_namespace }}
+    --for=condition=ready pod
+    --selector=app=mongo-express
+    --timeout=120s
+  changed_when: false
+
+- name: Display MongoDB deployment info
+  debug:
+    msg:
+      - "MongoDB deployed successfully"
+      - "Namespace: {{ mongodb_namespace }}"
+      - "Architecture: {{ mongodb_architecture }}"
+      - "Mongo Express UI: http://{{ mongodb_hostname }} (after ingress setup)"

@@ -46,7 +46,44 @@
         - { name: kiali, namespace: istio-system }
         - { name: kagent, namespace: kagent }
         - { name: agentgateway, namespace: kgateway-system }
+        - { name: influxdb, namespace: databases }
+        - { name: mongodb, namespace: databases }
       failed_when: false
+
+    # ===========================================
+    # Phase 1.5: Remove Databases (InfluxDB & MongoDB)
+    # ===========================================
+
+    - name: Delete Mongo Express deployment and service
+      command: kubectl delete {{ item.kind }} mongo-express -n databases
+      loop:
+        - { kind: deployment }
+        - { kind: service }
+      failed_when: false
+
+    - name: Delete InfluxDB ServiceMonitor
+      command: kubectl delete servicemonitor influxdb2 -n databases
+      failed_when: false
+
+    - name: Uninstall influxdb2 Helm release
+      command: helm uninstall influxdb2 -n databases
+      failed_when: false
+
+    - name: Uninstall mongodb Helm release
+      command: helm uninstall mongodb -n databases
+      failed_when: false
+
+    - name: Delete databases namespace
+      command: kubectl delete namespace databases --timeout=60s
+      failed_when: false
+
+    - name: Remove database values files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/influxdb-values.yaml
+        - /tmp/mongodb-values.yaml
 
     # ===========================================
     # Phase 2: Remove Kagent
@@ -219,6 +256,8 @@
         - metallb
         - prometheus-community
         - kiali
+        - influxdata
+        - bitnami
       failed_when: false
 
     # ===========================================
@@ -278,6 +317,8 @@
           - ""
           - "Removed:"
           - "  - Ingress routes (HTTPRoutes)"
+          - "  - InfluxDB 2.x"
+          - "  - MongoDB (including Mongo Express)"
           - "  - Kagent"
           - "  - kgateway (including GatewayClass)"
           - "  - Kiali"

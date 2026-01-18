@@ -6,6 +6,7 @@ gateway_name: homelab-gateway
 monitoring_namespace: monitoring
 kagent_namespace: kagent
 kgateway_namespace: kgateway-system
+databases_namespace: databases
 
 # DNS hostnames - configure these in your local DNS
 grafana_hostname: grafana.homelab.local
@@ -14,3 +15,5 @@ alertmanager_hostname: alertmanager.homelab.local
 kiali_hostname: kiali.homelab.local
 kagent_hostname: kagent.homelab.local
 agentgateway_hostname: agentgateway.homelab.local
+influxdb_hostname: influxdb.homelab.local
+mongodb_hostname: mongodb.homelab.local

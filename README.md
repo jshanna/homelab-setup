@@ -34,6 +34,9 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Istio | 1.27.1 | Service mesh (ambient mode) |
 | Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
 | Grafana | (via kube-prometheus-stack) | Metrics visualization |
+| InfluxDB | 2.1.2 | Time-series database |
+| MongoDB | 16.4.0 | Document database (Bitnami chart) |
+| Mongo Express | 1.0.2 | MongoDB web UI |
 | Kiali | 2.20.0 | Istio service mesh observability |
 | Kagent | latest | Kubernetes AI agent |
 | kgateway | v2.1.2 | Agent gateway for AI workloads |
@@ -148,6 +151,8 @@ kubernetes/
 │   ├── metallb/             # MetalLB load balancer
 │   ├── istio/               # Istio service mesh (ambient mode)
 │   ├── prometheus/          # kube-prometheus-stack
+│   ├── influxdb/            # InfluxDB 2.x time-series database
+│   ├── mongodb/             # MongoDB with Mongo Express UI
 │   ├── kiali/               # Kiali service mesh dashboard
 │   ├── kagent/              # Kubernetes AI agent
 │   ├── kgateway/            # Agent gateway
@@ -176,22 +181,25 @@ Deploys platform services on top of the cluster:
 2. Deploys MetalLB for LoadBalancer support
 3. Deploys Istio in ambient mode
 4. Deploys kube-prometheus-stack (Prometheus + Grafana)
-5. Deploys Kiali for service mesh visualization
-6. Deploys Kagent (AI agent for Kubernetes)
-7. Deploys kgateway (AgentGateway)
-8. Configures ingress routes via Istio Gateway
+5. Deploys InfluxDB 2.x time-series database
+6. Deploys MongoDB with Mongo Express web UI
+7. Deploys Kiali for service mesh visualization
+8. Deploys Kagent (AI agent for Kubernetes)
+9. Deploys kgateway (AgentGateway)
+10. Configures ingress routes via Istio Gateway
 
 ### reset-services.yml
 
 Removes all services deployed by services.yml while keeping the base cluster intact:
 
 1. Removes ingress routes (HTTPRoutes)
-2. Removes Kagent and kgateway
-3. Removes Kiali operator and CR
-4. Removes kube-prometheus-stack and CRDs
-5. Uninstalls Istio and Gateway API CRDs
-6. Removes MetalLB
-7. Cleans up Helm repositories
+2. Removes InfluxDB and MongoDB (including Mongo Express)
+3. Removes Kagent and kgateway
+4. Removes Kiali operator and CR
+5. Removes kube-prometheus-stack and CRDs
+6. Uninstalls Istio and Gateway API CRDs
+7. Removes MetalLB
+8. Cleans up Helm repositories
 
 ```bash
 ansible-playbook reset-services.yml --ask-pass --ask-become-pass
@@ -222,6 +230,8 @@ After deployment, configure DNS entries pointing to the gateway IP:
 | Grafana | http://grafana.homelab.local | 80 |
 | Prometheus | http://prometheus.homelab.local | 80 |
 | Alertmanager | http://alertmanager.homelab.local | 80 |
+| InfluxDB | http://influxdb.homelab.local | 80 |
+| MongoDB (Mongo Express) | http://mongodb.homelab.local | 80 |
 | Kiali | http://kiali.homelab.local | 80 |
 | Kagent | http://kagent.homelab.local | 80 |
 | AgentGateway | http://agentgateway.homelab.local/ui | 80 |
@@ -236,6 +246,8 @@ Add entries to your local DNS server or `/etc/hosts`:
 192.168.1.24  grafana.homelab.local
 192.168.1.24  prometheus.homelab.local
 192.168.1.24  alertmanager.homelab.local
+192.168.1.24  influxdb.homelab.local
+192.168.1.24  mongodb.homelab.local
 192.168.1.24  kiali.homelab.local
 192.168.1.24  kagent.homelab.local
 192.168.1.24  agentgateway.homelab.local
@@ -257,6 +269,13 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `grafana_admin_password` | prom-operator | Grafana admin password (do NOT use "admin") |
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
+| `influxdb_admin_password` | changeme | InfluxDB admin password (MUST change!) |
+| `influxdb_org` | homelab | InfluxDB organization name |
+| `influxdb_bucket` | default | InfluxDB default bucket |
+| `influxdb_storage_size` | 50Gi | InfluxDB storage size |
+| `mongodb_root_password` | changeme | MongoDB root password (MUST change!) |
+| `mongodb_architecture` | standalone | MongoDB architecture (standalone/replicaset) |
+| `mongodb_storage_size` | 20Gi | MongoDB storage size |
 | `kiali_version` | 2.20.0 | Kiali version (2.12+ required for Istio 1.27) |
 | `kagent_provider` | gemini | AI provider for Kagent |
 
@@ -310,6 +329,22 @@ Deploys kube-prometheus-stack:
 - Grafana for visualization
 - Alertmanager for alerts
 - Configures persistent storage
+
+### influxdb
+
+Deploys InfluxDB 2.x time-series database:
+- Installs via InfluxData Helm chart
+- Configures organization, bucket, and retention policy
+- Creates ServiceMonitor for Prometheus metrics
+- Persistent storage with configurable size
+
+### mongodb
+
+Deploys MongoDB document database:
+- Installs via Bitnami Helm chart
+- Configures authentication and persistence
+- Deploys Mongo Express web UI for database management
+- Enables metrics exporter with automatic ServiceMonitor
 
 ### kiali
 
@@ -387,6 +422,9 @@ See the [Playbooks](#playbooks) section for details on what each reset playbook 
 - [Istio](https://github.com/istio/istio)
 - [Prometheus](https://github.com/prometheus/prometheus)
 - [Grafana](https://github.com/grafana/grafana)
+- [InfluxDB](https://github.com/influxdata/influxdb)
+- [MongoDB](https://github.com/mongodb/mongo)
+- [Mongo Express](https://github.com/mongo-express/mongo-express)
 - [Kiali](https://github.com/kiali/kiali)
 - [Kagent](https://github.com/kagent-dev/kagent)
 - [AgentGateway](https://github.com/agentgateway/agentgateway)

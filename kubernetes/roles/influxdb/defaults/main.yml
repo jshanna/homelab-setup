@@ -1,0 +1,8 @@
+---
+influxdb_namespace: databases
+influxdb_chart_version: "2.1.2"
+influxdb_storage_size: "50Gi"
+influxdb_org: "homelab"
+influxdb_bucket: "default"
+influxdb_retention: "30d"
+influxdb_hostname: influxdb.homelab.local

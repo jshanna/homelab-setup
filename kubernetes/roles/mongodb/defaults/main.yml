@@ -1,0 +1,7 @@
+---
+mongodb_namespace: databases
+mongodb_chart_version: "16.4.0"
+mongodb_architecture: "standalone"
+mongodb_storage_size: "20Gi"
+mongodb_metrics_enabled: true
+mongodb_hostname: mongodb.homelab.local

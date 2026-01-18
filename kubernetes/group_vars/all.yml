@@ -57,3 +57,21 @@ alertmanager_hostname: "alertmanager.homelab.local"
 kiali_hostname: "kiali.homelab.local"
 kagent_hostname: "kagent.homelab.local"
 agentgateway_hostname: "agentgateway.homelab.local"
+
+# ===========================================
+# Database Configuration (InfluxDB & MongoDB)
+# ===========================================
+influxdb_admin_password: "changeme"  # MUST CHANGE before running!
+influxdb_admin_token: ""  # Leave empty for auto-generation
+influxdb_org: "homelab"
+influxdb_bucket: "default"
+influxdb_retention: "30d"
+influxdb_storage_size: "50Gi"
+
+mongodb_root_password: "changeme"  # MUST CHANGE before running!
+mongodb_architecture: "standalone"
+mongodb_storage_size: "20Gi"
+
+# Database DNS Hostnames
+influxdb_hostname: "influxdb.homelab.local"
+mongodb_hostname: "mongodb.homelab.local"

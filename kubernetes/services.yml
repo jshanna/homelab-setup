@@ -55,6 +55,22 @@
   roles:
     - prometheus
 
+- name: Deploy InfluxDB 2.x
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - influxdb
+
+- name: Deploy MongoDB
+  hosts: control_plane
+  become: yes
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - mongodb
+
 - name: Deploy Kiali
   hosts: control_plane
   become: yes

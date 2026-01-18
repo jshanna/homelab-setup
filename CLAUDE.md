@@ -49,9 +49,10 @@ The setup uses two sequential playbooks:
    - Calico CNI installed via **Tigera operator** (not simple manifest)
 
 2. **services.yml** - Platform services (runs on control plane only)
-   - Deploys in order: Helm → MetalLB → Istio → Prometheus → Kiali → Kagent → kgateway → Ingress routes
+   - Deploys in order: Helm → MetalLB → Istio → Prometheus → InfluxDB → MongoDB → Kiali → Kagent → kgateway → Ingress routes
    - All services integrate through Istio Gateway API for ingress
    - MetalLB provides LoadBalancer IPs from configured pool
+   - Databases deployed to `databases` namespace with Prometheus metrics
 
 3. **reset-services.yml** - Removes services only, keeps cluster
 4. **reset.yml** - Full cluster teardown (removes K8s, containerd, kernel configs, repos)
@@ -83,6 +84,9 @@ The setup uses two sequential playbooks:
 | kube-prometheus-stack | 72.6.4 | Helm chart |
 | Kiali | 2.20.0 | Operator install, requires 2.12+ for Istio 1.27 |
 | kgateway | v2.1.2 | Requires Gateway API v1.4.0 |
+| InfluxDB | 2.1.2 | Helm chart, time-series database |
+| MongoDB | 16.4.0 | Bitnami Helm chart, standalone mode |
+| Mongo Express | 1.0.2 | Web UI for MongoDB |
 
 ## Important Implementation Details
 
@@ -91,6 +95,7 @@ The setup uses two sequential playbooks:
 - **Calico installation**: Uses Tigera operator + custom-resources.yaml, NOT the simple calico.yaml manifest. Pods run in `calico-system` namespace.
 - **GPG keys**: Uses modern `/etc/apt/keyrings/` directory with `gpg --dearmor`, not deprecated `apt_key`.
 - **Grafana password**: Must change from "changeme" in group_vars/all.yml before running services.yml.
+- **Database passwords**: Both `influxdb_admin_password` and `mongodb_root_password` must be changed from "changeme" in group_vars/all.yml before running services.yml.
 
 ## Troubleshooting Reference
 

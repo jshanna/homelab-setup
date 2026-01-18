@@ -1,0 +1,102 @@
+---
+- name: Validate InfluxDB admin password is set
+  fail:
+    msg: "influxdb_admin_password must be set in group_vars/all.yml. Do not use 'admin', 'changeme', or empty."
+  when: influxdb_admin_password is not defined or influxdb_admin_password == "" or influxdb_admin_password == "changeme" or influxdb_admin_password == "admin"
+
+- name: Add InfluxData Helm repository
+  command: helm repo add influxdata https://helm.influxdata.com/
+  register: helm_repo_result
+  changed_when: "'has been added' in helm_repo_result.stdout"
+  failed_when: false
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false
+
+- name: Create databases namespace
+  command: kubectl create namespace {{ influxdb_namespace }}
+  register: ns_result
+  changed_when: "'created' in ns_result.stdout"
+  failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
+
+- name: Create InfluxDB values file
+  copy:
+    dest: /tmp/influxdb-values.yaml
+    content: |
+      adminUser:
+        organization: "{{ influxdb_org }}"
+        bucket: "{{ influxdb_bucket }}"
+        user: "admin"
+        password: "{{ influxdb_admin_password }}"
+        retention_policy: "{{ influxdb_retention }}"
+        {% if influxdb_admin_token is defined and influxdb_admin_token != "" %}
+        token: "{{ influxdb_admin_token }}"
+        {% endif %}
+      persistence:
+        enabled: true
+        size: {{ influxdb_storage_size }}
+      service:
+        type: ClusterIP
+        port: 80
+        targetPort: 8086
+      resources:
+        requests:
+          memory: 256Mi
+          cpu: 100m
+        limits:
+          memory: 1Gi
+
+- name: Install/upgrade InfluxDB 2.x
+  command: >
+    helm upgrade -i influxdb2 influxdata/influxdb2
+    --namespace {{ influxdb_namespace }}
+    --version {{ influxdb_chart_version }}
+    --values /tmp/influxdb-values.yaml
+    --wait --timeout 5m
+
+- name: Wait for InfluxDB to be ready
+  command: >
+    kubectl wait --namespace {{ influxdb_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=influxdb2
+    --timeout=300s
+  changed_when: false
+
+# ===========================================
+# Prometheus monitoring (ServiceMonitor)
+# ===========================================
+
+- name: Create ServiceMonitor for InfluxDB
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: influxdb2
+        namespace: {{ influxdb_namespace }}
+        labels:
+          app: influxdb2
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: influxdb2
+        namespaceSelector:
+          matchNames:
+            - {{ influxdb_namespace }}
+        endpoints:
+          - port: http
+            interval: 30s
+            path: /metrics
+  register: influxdb_monitor
+  changed_when: "'created' in influxdb_monitor.stdout or 'configured' in influxdb_monitor.stdout"
+
+- name: Display InfluxDB deployment info
+  debug:
+    msg:
+      - "InfluxDB 2.x deployed successfully"
+      - "Namespace: {{ influxdb_namespace }}"
+      - "Organization: {{ influxdb_org }}"
+      - "Default bucket: {{ influxdb_bucket }}"
+      - "Access via: http://{{ influxdb_hostname }} (after ingress setup)"
