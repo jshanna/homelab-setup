@@ -96,8 +96,14 @@
                     value: "{{ mongodb_root_password }}"
                   - name: ME_CONFIG_MONGODB_SERVER
                     value: "mongodb"
+                  - name: ME_CONFIG_MONGODB_PORT
+                    value: "27017"
+                  - name: ME_CONFIG_MONGODB_URL
+                    value: "mongodb://root:{{ mongodb_root_password }}@mongodb:27017/"
                   - name: ME_CONFIG_BASICAUTH
                     value: "false"
+                  - name: WAIT_HOSTS
+                    value: "mongodb:27017"
                 resources:
                   requests:
                     memory: 64Mi

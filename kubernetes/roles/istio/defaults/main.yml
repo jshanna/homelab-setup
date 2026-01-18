@@ -13,9 +13,11 @@ gateway_api_version: "v1.4.0"
 # kube-public: public info namespace
 # istio-system: control plane and gateways handle their own security
 # kgateway-system: agentgateway has issues with ambient mode
+# databases: MongoDB connections fail with ambient mode (ztunnel closes connections)
 ambient_excluded_namespaces:
   - kube-system
   - kube-node-lease
   - kube-public
   - istio-system
   - kgateway-system
+  - databases
