@@ -196,6 +196,32 @@
   register: influxdb_route
   changed_when: "'created' in influxdb_route.stdout or 'configured' in influxdb_route.stdout"
 
+- name: Create HTTPRoute for InfluxDB Explorer
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: influxdb-explorer
+        namespace: {{ databases_namespace }}
+      spec:
+        parentRefs:
+          - name: {{ gateway_name }}
+            namespace: {{ istio_namespace }}
+        hostnames:
+          - "{{ influxdb_explorer_hostname }}"
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /
+            backendRefs:
+              - name: influxdb-explorer
+                port: 80
+  register: influxdb_explorer_route
+  changed_when: "'created' in influxdb_explorer_route.stdout or 'configured' in influxdb_explorer_route.stdout"
+
 - name: Create HTTPRoute for MongoDB (Mongo Express)
   command: kubectl apply -f -
   args:
@@ -236,22 +262,24 @@
       - "Gateway IP: {{ gateway_ip.stdout }}"
       - "=========================================="
       - "Configure these DNS entries in your local DNS:"
-      - "  {{ grafana_hostname }}       -> {{ gateway_ip.stdout }}"
-      - "  {{ prometheus_hostname }}    -> {{ gateway_ip.stdout }}"
-      - "  {{ alertmanager_hostname }}  -> {{ gateway_ip.stdout }}"
-      - "  {{ kiali_hostname }}         -> {{ gateway_ip.stdout }}"
-      - "  {{ kagent_hostname }}        -> {{ gateway_ip.stdout }}"
-      - "  {{ agentgateway_hostname }}  -> {{ gateway_ip.stdout }}"
-      - "  {{ influxdb_hostname }}      -> {{ gateway_ip.stdout }}"
-      - "  {{ mongodb_hostname }}       -> {{ gateway_ip.stdout }}"
+      - "  {{ grafana_hostname }}            -> {{ gateway_ip.stdout }}"
+      - "  {{ prometheus_hostname }}         -> {{ gateway_ip.stdout }}"
+      - "  {{ alertmanager_hostname }}       -> {{ gateway_ip.stdout }}"
+      - "  {{ kiali_hostname }}              -> {{ gateway_ip.stdout }}"
+      - "  {{ kagent_hostname }}             -> {{ gateway_ip.stdout }}"
+      - "  {{ agentgateway_hostname }}       -> {{ gateway_ip.stdout }}"
+      - "  {{ influxdb_hostname }}           -> {{ gateway_ip.stdout }}"
+      - "  {{ influxdb_explorer_hostname }}  -> {{ gateway_ip.stdout }}"
+      - "  {{ mongodb_hostname }}            -> {{ gateway_ip.stdout }}"
       - "=========================================="
       - "Access URLs:"
-      - "  Grafana:       http://{{ grafana_hostname }}"
-      - "  Prometheus:    http://{{ prometheus_hostname }}"
-      - "  Alertmanager:  http://{{ alertmanager_hostname }}"
-      - "  Kiali:         http://{{ kiali_hostname }}"
-      - "  Kagent:        http://{{ kagent_hostname }}"
-      - "  AgentGateway:  http://{{ agentgateway_hostname }}/ui"
-      - "  InfluxDB:      http://{{ influxdb_hostname }}"
-      - "  MongoDB:       http://{{ mongodb_hostname }} (Mongo Express)"
+      - "  Grafana:           http://{{ grafana_hostname }}"
+      - "  Prometheus:        http://{{ prometheus_hostname }}"
+      - "  Alertmanager:      http://{{ alertmanager_hostname }}"
+      - "  Kiali:             http://{{ kiali_hostname }}"
+      - "  Kagent:            http://{{ kagent_hostname }}"
+      - "  AgentGateway:      http://{{ agentgateway_hostname }}/ui"
+      - "  InfluxDB API:      http://{{ influxdb_hostname }}"
+      - "  InfluxDB Explorer: http://{{ influxdb_explorer_hostname }}"
+      - "  MongoDB:           http://{{ mongodb_hostname }} (Mongo Express)"
       - "=========================================="

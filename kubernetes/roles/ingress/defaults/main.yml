@@ -16,4 +16,5 @@ kiali_hostname: kiali.homelab.local
 kagent_hostname: kagent.homelab.local
 agentgateway_hostname: agentgateway.homelab.local
 influxdb_hostname: influxdb.homelab.local
+influxdb_explorer_hostname: influxdb-explorer.homelab.local
 mongodb_hostname: mongodb.homelab.local

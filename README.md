@@ -35,6 +35,7 @@ Ansible playbooks for provisioning a production-like Kubernetes cluster on homel
 | Prometheus | kube-prometheus-stack 72.6.4 | Metrics collection and alerting |
 | Grafana | (via kube-prometheus-stack) | Metrics visualization |
 | InfluxDB | 3 Core | Time-series database (official image) |
+| InfluxDB Explorer | latest | InfluxDB 3 web UI |
 | MongoDB | latest | Document database (Bitnami chart) |
 | Mongo Express | 1.0.2 | MongoDB web UI |
 | Kiali | 2.20.0 | Istio service mesh observability |
@@ -230,7 +231,8 @@ After deployment, configure DNS entries pointing to the gateway IP:
 | Grafana | http://grafana.homelab.local | 80 |
 | Prometheus | http://prometheus.homelab.local | 80 |
 | Alertmanager | http://alertmanager.homelab.local | 80 |
-| InfluxDB | http://influxdb.homelab.local | 80 |
+| InfluxDB API | http://influxdb.homelab.local | 80 |
+| InfluxDB Explorer | http://influxdb-explorer.homelab.local | 80 |
 | MongoDB (Mongo Express) | http://mongodb.homelab.local | 80 |
 | Kiali | http://kiali.homelab.local | 80 |
 | Kagent | http://kagent.homelab.local | 80 |
@@ -247,6 +249,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 192.168.1.24  prometheus.homelab.local
 192.168.1.24  alertmanager.homelab.local
 192.168.1.24  influxdb.homelab.local
+192.168.1.24  influxdb-explorer.homelab.local
 192.168.1.24  mongodb.homelab.local
 192.168.1.24  kiali.homelab.local
 192.168.1.24  kagent.homelab.local
@@ -271,6 +274,7 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
 | `influxdb_admin_token` | changeme | InfluxDB bearer token (MUST change!) |
 | `influxdb_storage_size` | 50Gi | InfluxDB storage size |
+| `influxdb_explorer_session_secret` | changeme | Explorer session key (MUST change!) |
 | `mongodb_root_password` | changeme | MongoDB root password (MUST change!) |
 | `mongodb_architecture` | standalone | MongoDB architecture (standalone/replicaset) |
 | `mongodb_storage_size` | 20Gi | MongoDB storage size |
@@ -337,6 +341,7 @@ Deploys InfluxDB 3 Core time-series database:
 - ServiceMonitor for Prometheus metrics
 - Persistent storage with configurable size
 - Handles migration from older deployments automatically
+- Deploys InfluxDB 3 Explorer web UI for interactive SQL queries
 
 ### mongodb
 

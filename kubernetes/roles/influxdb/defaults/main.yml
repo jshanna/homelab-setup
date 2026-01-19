@@ -5,3 +5,7 @@ influxdb_chart_version: ""
 influxdb_storage_size: "50Gi"
 influxdb_hostname: influxdb.homelab.local
 influxdb_metrics_enabled: true
+
+# InfluxDB 3 Explorer (Web UI)
+influxdb_explorer_hostname: influxdb-explorer.homelab.local
+influxdb_explorer_session_secret: "change-me-to-random-hex"

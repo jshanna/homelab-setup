@@ -47,6 +47,7 @@
         - { name: kagent, namespace: kagent }
         - { name: agentgateway, namespace: kgateway-system }
         - { name: influxdb, namespace: databases }
+        - { name: influxdb-explorer, namespace: databases }
         - { name: mongodb, namespace: databases }
       failed_when: false
 
@@ -76,6 +77,9 @@
         - { kind: servicemonitor, name: influxdb }
         - { kind: secret, name: influxdb-auth }
         - { kind: pvc, name: influxdb-data }
+        - { kind: deployment, name: influxdb-explorer }
+        - { kind: service, name: influxdb-explorer }
+        - { kind: secret, name: influxdb-explorer }
       failed_when: false
 
     - name: Uninstall mongodb Helm release
@@ -327,7 +331,7 @@
           - ""
           - "Removed:"
           - "  - Ingress routes (HTTPRoutes)"
-          - "  - InfluxDB 2.x"
+          - "  - InfluxDB 3 Core and Explorer"
           - "  - MongoDB (including Mongo Express)"
           - "  - Kagent"
           - "  - kgateway (including GatewayClass)"
