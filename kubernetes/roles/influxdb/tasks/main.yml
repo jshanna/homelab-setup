@@ -4,6 +4,11 @@
     msg: "influxdb_admin_token must be set in group_vars/all.yml. Do not use 'admin', 'changeme', or empty."
   when: influxdb_admin_token is not defined or influxdb_admin_token == "" or influxdb_admin_token == "changeme" or influxdb_admin_token == "admin"
 
+- name: Validate InfluxDB Explorer session secret is set
+  fail:
+    msg: "influxdb_explorer_session_secret must be set in group_vars/all.yml. Do not use default values."
+  when: influxdb_explorer_session_secret is not defined or influxdb_explorer_session_secret == "" or influxdb_explorer_session_secret == "change-me-to-random-hex" or influxdb_explorer_session_secret == "explorer_session"
+
 # ===========================================
 # Migration: Remove old InfluxDB deployments
 # ===========================================
