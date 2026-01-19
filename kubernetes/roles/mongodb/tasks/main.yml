@@ -20,6 +20,16 @@
   changed_when: "'created' in ns_result.stdout"
   failed_when: "ns_result.rc != 0 and 'already exists' not in ns_result.stderr"
 
+- name: Check if MongoDB is already running and healthy
+  command: >
+    kubectl wait --namespace {{ mongodb_namespace }}
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/name=mongodb
+    --timeout=5s
+  register: mongodb_health_check
+  failed_when: false
+  changed_when: false
+
 - name: Create MongoDB values file
   copy:
     dest: /tmp/mongodb-values.yaml
@@ -42,14 +52,21 @@
         enabled: {{ mongodb_metrics_enabled | lower }}
         serviceMonitor:
           enabled: {{ mongodb_metrics_enabled | lower }}
+  when: mongodb_health_check.rc != 0
 
-- name: Install/upgrade MongoDB
+- name: Install MongoDB (skip if already healthy)
   command: >
     helm upgrade -i mongodb bitnami/mongodb
     --namespace {{ mongodb_namespace }}
     {{ '--version ' + mongodb_chart_version if mongodb_chart_version else '' }}
     --values /tmp/mongodb-values.yaml
     --wait --timeout 10m
+  when: mongodb_health_check.rc != 0
+
+- name: MongoDB already running
+  debug:
+    msg: "MongoDB is already running and healthy - skipping Helm upgrade to avoid disruption"
+  when: mongodb_health_check.rc == 0
 
 - name: Wait for MongoDB to be ready
   command: >
@@ -58,6 +75,7 @@
     --selector=app.kubernetes.io/name=mongodb
     --timeout=300s
   changed_when: false
+  when: mongodb_health_check.rc != 0
 
 # ===========================================
 # Deploy Mongo Express (Web UI)
