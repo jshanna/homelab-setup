@@ -185,9 +185,16 @@
   register: influxdb_token_output
   when: need_influxdb_token | bool
 
+- name: Debug token output
+  debug:
+    msg: "Token command output: {{ influxdb_token_output.stdout }}"
+  when:
+    - need_influxdb_token | bool
+    - influxdb_token_output.stdout is defined
+
 - name: Extract token from output
   set_fact:
-    influxdb_admin_token: "{{ influxdb_token_output.stdout | regex_search('Token:\\s*(.+)', '\\1') | first | trim }}"
+    influxdb_admin_token: "{{ influxdb_token_output.stdout | trim }}"
   when:
     - need_influxdb_token | bool
     - influxdb_token_output.stdout is defined
