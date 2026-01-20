@@ -55,7 +55,7 @@
   roles:
     - prometheus
 
-- name: Deploy InfluxDB 2.x
+- name: Deploy InfluxDB 3 Core
   hosts: control_plane
   become: yes
   environment:
