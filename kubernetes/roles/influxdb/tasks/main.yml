@@ -217,12 +217,13 @@
 
 - name: Extract token from output
   set_fact:
-    influxdb_admin_token: "{{ influxdb_token_output.stdout | trim }}"
+    # Strip ANSI codes and extract token after "Token:" line
+    influxdb_admin_token: "{{ influxdb_token_output.stdout | regex_replace('\\x1b\\[[0-9;]*m', '') | regex_search('Token:\\s*(apiv3_[A-Za-z0-9_-]+)') | regex_replace('Token:\\s*', '') }}"
   when:
     - need_influxdb_token | bool
     - influxdb_token_output.rc == 0
     - influxdb_token_output.stdout is defined
-    - influxdb_token_output.stdout | trim | length > 0
+    - "'apiv3_' in influxdb_token_output.stdout"
 
 - name: Delete existing auth secret if regenerating
   command: kubectl delete secret influxdb-auth -n {{ influxdb_namespace }}
@@ -246,7 +247,8 @@
       - "=========================================="
       - "NEW INFLUXDB ADMIN TOKEN CREATED"
       - "=========================================="
-      - "Token: {{ influxdb_admin_token }}"
+      - ""
+      - "{{ influxdb_admin_token }}"
       - ""
       - "IMPORTANT: Save this token! It cannot be retrieved later."
       - "Use this token in InfluxDB Explorer to connect."
