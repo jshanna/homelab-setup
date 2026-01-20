@@ -192,18 +192,18 @@
     - need_influxdb_token | bool
     - influxdb_token_output.stdout is defined
 
+- name: Delete existing auth secret if regenerating
+  command: kubectl delete secret influxdb-auth -n {{ influxdb_namespace }}
+  failed_when: false
+  when:
+    - need_influxdb_token | bool
+    - influxdb_admin_token is defined
+
 - name: Create secret with admin token
-  command: kubectl apply -f -
-  args:
-    stdin: |
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: influxdb-auth
-        namespace: {{ influxdb_namespace }}
-      type: Opaque
-      stringData:
-        admin-token: "{{ influxdb_admin_token }}"
+  command: >
+    kubectl create secret generic influxdb-auth
+    -n {{ influxdb_namespace }}
+    --from-literal=admin-token={{ influxdb_admin_token }}
   when:
     - need_influxdb_token | bool
     - influxdb_admin_token is defined
