@@ -183,21 +183,46 @@
     kubectl exec -n {{ influxdb_namespace }} deploy/influxdb --
     influxdb3 create token --admin
   register: influxdb_token_output
+  failed_when: false
   when: need_influxdb_token | bool
 
 - name: Debug token output
   debug:
-    msg: "Token command output: {{ influxdb_token_output.stdout }}"
+    msg:
+      - "stdout: {{ influxdb_token_output.stdout | default('') }}"
+      - "stderr: {{ influxdb_token_output.stderr | default('') }}"
+      - "rc: {{ influxdb_token_output.rc | default('') }}"
   when:
     - need_influxdb_token | bool
-    - influxdb_token_output.stdout is defined
+
+- name: Check if token already exists in InfluxDB
+  set_fact:
+    influxdb_token_already_exists: "{{ 'already exists' in (influxdb_token_output.stdout | default('')) }}"
+  when: need_influxdb_token | bool
+
+- name: Fail if token exists but secret is missing
+  fail:
+    msg: |
+      InfluxDB already has an admin token created, but the secret is missing.
+      This can happen if a previous deployment was interrupted.
+
+      To fix this, you need to reset the InfluxDB data:
+        kubectl delete pvc influxdb-data -n {{ influxdb_namespace }}
+        kubectl delete pod -l app.kubernetes.io/name=influxdb -n {{ influxdb_namespace }}
+
+      Then re-run the playbook.
+  when:
+    - need_influxdb_token | bool
+    - influxdb_token_already_exists | default(false) | bool
 
 - name: Extract token from output
   set_fact:
     influxdb_admin_token: "{{ influxdb_token_output.stdout | trim }}"
   when:
     - need_influxdb_token | bool
+    - influxdb_token_output.rc == 0
     - influxdb_token_output.stdout is defined
+    - influxdb_token_output.stdout | trim | length > 0
 
 - name: Delete existing auth secret if regenerating
   command: kubectl delete secret influxdb-auth -n {{ influxdb_namespace }}
@@ -207,10 +232,10 @@
     - influxdb_admin_token is defined
 
 - name: Create secret with admin token
-  command: >
+  shell: >
     kubectl create secret generic influxdb-auth
     -n {{ influxdb_namespace }}
-    --from-literal=admin-token={{ influxdb_admin_token }}
+    --from-literal=admin-token='{{ influxdb_admin_token }}'
   when:
     - need_influxdb_token | bool
     - influxdb_admin_token is defined
