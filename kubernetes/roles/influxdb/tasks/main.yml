@@ -1,8 +1,6 @@
 ---
-- name: Validate InfluxDB admin token is set
-  fail:
-    msg: "influxdb_admin_token must be set in group_vars/all.yml. Do not use 'admin', 'changeme', or empty."
-  when: influxdb_admin_token is not defined or influxdb_admin_token == "" or influxdb_admin_token == "changeme" or influxdb_admin_token == "admin"
+# Note: influxdb_admin_token is no longer user-provided.
+# InfluxDB 3 generates tokens via CLI - we create it after startup.
 
 - name: Validate InfluxDB Explorer session secret is set
   fail:
@@ -81,15 +79,6 @@
           requests:
             storage: {{ influxdb_storage_size }}
       ---
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: influxdb-auth
-        namespace: {{ influxdb_namespace }}
-      type: Opaque
-      stringData:
-        admin-token: "{{ influxdb_admin_token }}"
-      ---
       apiVersion: apps/v1
       kind: Deployment
       metadata:
@@ -121,12 +110,6 @@
                 ports:
                   - containerPort: 8181
                     name: http
-                env:
-                  - name: INFLUXDB3_BEARER_TOKEN
-                    valueFrom:
-                      secretKeyRef:
-                        name: influxdb-auth
-                        key: admin-token
                 resources:
                   requests:
                     memory: 256Mi
@@ -178,6 +161,80 @@
     --selector=app.kubernetes.io/name=influxdb
     --timeout=300s
   changed_when: false
+
+# ===========================================
+# Generate admin token (InfluxDB 3 requires CLI token generation)
+# ===========================================
+
+- name: Check if admin token already exists in secret
+  command: >
+    kubectl get secret influxdb-auth -n {{ influxdb_namespace }}
+    -o jsonpath='{.data.admin-token}'
+  register: existing_token_check
+  failed_when: false
+  changed_when: false
+
+- name: Set token generation flag
+  set_fact:
+    need_influxdb_token: "{{ existing_token_check.rc != 0 or existing_token_check.stdout == '' }}"
+
+- name: Create InfluxDB admin token
+  command: >
+    kubectl exec -n {{ influxdb_namespace }} deploy/influxdb --
+    influxdb3 create token --admin
+  register: influxdb_token_output
+  when: need_influxdb_token | bool
+
+- name: Extract token from output
+  set_fact:
+    influxdb_admin_token: "{{ influxdb_token_output.stdout | regex_search('Token:\\s*(.+)', '\\1') | first | trim }}"
+  when:
+    - need_influxdb_token | bool
+    - influxdb_token_output.stdout is defined
+
+- name: Create secret with admin token
+  command: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: influxdb-auth
+        namespace: {{ influxdb_namespace }}
+      type: Opaque
+      stringData:
+        admin-token: "{{ influxdb_admin_token }}"
+  when:
+    - need_influxdb_token | bool
+    - influxdb_admin_token is defined
+
+- name: Display new admin token
+  debug:
+    msg:
+      - "=========================================="
+      - "NEW INFLUXDB ADMIN TOKEN CREATED"
+      - "=========================================="
+      - "Token: {{ influxdb_admin_token }}"
+      - ""
+      - "IMPORTANT: Save this token! It cannot be retrieved later."
+      - "Use this token in InfluxDB Explorer to connect."
+      - "=========================================="
+  when:
+    - need_influxdb_token | bool
+    - influxdb_admin_token is defined
+
+- name: Get existing token from secret
+  shell: >
+    kubectl get secret influxdb-auth -n {{ influxdb_namespace }}
+    -o jsonpath='{.data.admin-token}' | base64 -d
+  register: existing_token
+  changed_when: false
+  when: not (need_influxdb_token | bool)
+
+- name: Display existing token info
+  debug:
+    msg: "InfluxDB admin token already exists. Retrieve with: kubectl get secret influxdb-auth -n {{ influxdb_namespace }} -o jsonpath='{.data.admin-token}' | base64 -d"
+  when: not (need_influxdb_token | bool)
 
 # ===========================================
 # Prometheus monitoring (ServiceMonitor)
@@ -297,8 +354,9 @@
       - "Image: influxdb:3-core (official)"
       - "API Port: 8181"
       - "Access via: http://{{ influxdb_hostname }} (after ingress setup)"
-      - "Auth: Bearer token (configured in secret)"
       - ""
       - "InfluxDB 3 Explorer (Web UI) deployed"
       - "Access via: http://{{ influxdb_explorer_hostname }} (after ingress setup)"
-      - "Connect to: http://influxdb:8181 (from within Explorer UI)"
+      - ""
+      - "To get admin token: kubectl get secret influxdb-auth -n {{ influxdb_namespace }} -o jsonpath='{.data.admin-token}' | base64 -d"
+      - "Use this token in Explorer to connect to: http://influxdb:8181"

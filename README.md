@@ -272,7 +272,6 @@ Add entries to your local DNS server or `/etc/hosts`:
 | `grafana_admin_password` | prom-operator | Grafana admin password (do NOT use "admin") |
 | `prometheus_retention` | 15d | Prometheus data retention |
 | `prometheus_storage_size` | 50Gi | Prometheus storage size |
-| `influxdb_admin_token` | changeme | InfluxDB bearer token (MUST change!) |
 | `influxdb_storage_size` | 50Gi | InfluxDB storage size |
 | `influxdb_explorer_session_secret` | changeme | Explorer session key (MUST change!) |
 | `mongodb_root_password` | changeme | MongoDB root password (MUST change!) |
@@ -337,11 +336,16 @@ Deploys kube-prometheus-stack:
 Deploys InfluxDB 3 Core time-series database:
 - Uses official `influxdb:3-core` Docker image (not Helm)
 - Direct Kubernetes deployment for reliability
-- Uses bearer token authentication
+- Auto-generates admin token via CLI after startup (stored in `influxdb-auth` secret)
 - ServiceMonitor for Prometheus metrics
 - Persistent storage with configurable size
 - Handles migration from older deployments automatically
 - Deploys InfluxDB 3 Explorer web UI for interactive SQL queries
+
+To retrieve the auto-generated admin token:
+```bash
+kubectl get secret influxdb-auth -n databases -o jsonpath='{.data.admin-token}' | base64 -d
+```
 
 ### mongodb
 
